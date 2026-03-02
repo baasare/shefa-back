@@ -10,7 +10,6 @@ import asyncio
 
 from .models import Quote, Indicator
 from .provider_manager import get_provider_manager, fetch_quote_with_fallback, fetch_historical_with_fallback
-from .cache import MarketDataCache
 from .indicators import (
     calculate_rsi,
     calculate_macd,
@@ -19,6 +18,7 @@ from .indicators import (
     calculate_ema,
     calculate_atr
 )
+from .providers import MassiveProvider, AlphaVantageProvider
 
 logger = logging.getLogger(__name__)
 
