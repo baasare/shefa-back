@@ -3,17 +3,17 @@ Celery tasks for asynchronous order processing and monitoring.
 
 Handles background order status updates, monitoring, and reconciliation.
 """
-from celery import shared_task
-from celery.utils.log import get_task_logger
-from django.utils import timezone
-from datetime import timedelta
-from typing import List, Optional
 import asyncio
+from celery import shared_task
+from datetime import timedelta
+from django.utils import timezone
+from celery.utils.log import get_task_logger
 
-from .models import Order, Trade
-from .execution import OrderExecutionEngine, OrderExecutionError
+from apps.orders.models import Order
 from apps.brokers.models import BrokerConnection
+from apps.orders.audit.trail import log_order_activity
 from apps.brokers.services import get_broker_client
+from apps.orders.execution import OrderExecutionEngine, OrderExecutionError
 
 logger = get_task_logger(__name__)
 
@@ -56,6 +56,29 @@ def update_order_status(self, order_id: int):
         try:
             updated_order = loop.run_until_complete(engine.update_order_status(order))
             logger.info(f"Updated order {order_id} status to {updated_order.status}")
+
+            # Log status updates for important transitions
+            if updated_order.status == 'filled':
+                log_order_activity(
+                    updated_order,
+                    'order_filled',
+                    success=True,
+                    automated=True
+                )
+            elif updated_order.status == 'partially_filled':
+                log_order_activity(
+                    updated_order,
+                    'order_partially_filled',
+                    success=True,
+                    automated=True
+                )
+            elif updated_order.status == 'rejected':
+                log_order_activity(
+                    updated_order,
+                    'order_rejected',
+                    success=False,
+                    automated=True
+                )
         finally:
             loop.close()
 
@@ -130,6 +153,16 @@ def cancel_order_async(self, order_id: int):
         try:
             success = loop.run_until_complete(engine.cancel_order(order))
             logger.info(f"Cancelled order {order_id}")
+
+            # Log cancellation
+            log_order_activity(
+                order,
+                'order_cancelled',
+                success=success,
+                automated=True,
+                task_id=self.request.id
+            )
+
             return {'success': success}
         finally:
             loop.close()
@@ -140,6 +173,19 @@ def cancel_order_async(self, order_id: int):
 
     except OrderExecutionError as e:
         logger.error(f"Error cancelling order {order_id}: {e}")
+        # Log failed cancellation attempt
+        try:
+            order = Order.objects.get(id=order_id)
+            log_order_activity(
+                order,
+                'order_cancelled',
+                success=False,
+                error_message=str(e),
+                automated=True,
+                task_id=self.request.id
+            )
+        except:
+            pass
         return {'success': False, 'error': str(e)}
 
     except Exception as e:
@@ -365,24 +411,3 @@ def sync_positions_from_broker(self, user_id: int, portfolio_id: int):
     except Exception as e:
         logger.error(f"Error syncing positions: {e}")
         return {'success': False, 'error': str(e)}
-
-
-# Periodic task schedule configuration
-# Add to celeryconfig.py or settings:
-"""
-CELERY_BEAT_SCHEDULE = {
-    'monitor-pending-orders': {
-        'task': 'apps.orders.tasks.monitor_pending_orders',
-        'schedule': 30.0,  # Every 30 seconds
-    },
-    'check-stale-orders': {
-        'task': 'apps.orders.tasks.check_stale_orders',
-        'schedule': crontab(minute='*/15'),  # Every 15 minutes
-    },
-    'cleanup-old-orders': {
-        'task': 'apps.orders.tasks.cleanup_old_orders',
-        'schedule': crontab(hour=2, minute=0),  # Daily at 2 AM
-        'kwargs': {'days': 90}
-    },
-}
-"""

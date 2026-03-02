@@ -12,6 +12,10 @@ import logging
 
 from .models import Order, Trade
 from apps.portfolios.models import Portfolio
+from apps.orders.audit.trail import (
+    log_order_activity,
+    get_order_audit_trail
+)
 
 logger = logging.getLogger(__name__)
 
@@ -460,3 +464,207 @@ def format_order_for_display(order: Order) -> Dict[str, Any]:
         'broker_order_id': order.broker_order_id,
         'portfolio_id': order.portfolio_id,
     }
+
+
+def cancel_order_with_audit(order: Order, user, reason: str = '', request=None) -> tuple[bool, Optional[str]]:
+    """
+    Cancel an order and log to audit trail.
+
+    Args:
+        order: Order instance to cancel
+        user: User canceling the order
+        reason: Reason for cancellation
+        request: HTTP request object for audit logging
+
+    Returns:
+        Tuple of (success, error_message)
+    """
+    # Validate can be cancelled
+    can_modify, error = validate_order_modification(order)
+    if not can_modify:
+        log_order_activity(
+            order,
+            'order_cancelled',
+            user=user,
+            request=request,
+            success=False,
+            error_message=error,
+            reason=reason
+        )
+        return False, error
+
+    try:
+        # Update order status
+        order.status = 'cancelled'
+        order.save()
+
+        # Log successful cancellation
+        log_order_activity(
+            order,
+            'order_cancelled',
+            user=user,
+            request=request,
+            success=True,
+            reason=reason
+        )
+
+        logger.info(f"Order {order.id} cancelled by {user.email}. Reason: {reason}")
+        return True, None
+
+    except Exception as e:
+        error_msg = str(e)
+        log_order_activity(
+            order,
+            'order_cancelled',
+            user=user,
+            request=request,
+            success=False,
+            error_message=error_msg,
+            reason=reason
+        )
+        logger.error(f"Error cancelling order {order.id}: {e}")
+        return False, error_msg
+
+
+def approve_order_with_audit(order: Order, user, request=None) -> tuple[bool, Optional[str]]:
+    """
+    Approve a pending order (HITL) and log to audit trail.
+
+    Args:
+        order: Order instance to approve
+        user: User approving the order
+        request: HTTP request object for audit logging
+
+    Returns:
+        Tuple of (success, error_message)
+    """
+    if order.status != 'pending_approval':
+        error = f"Order not in pending_approval status: {order.status}"
+        log_order_activity(
+            order,
+            'order_approved',
+            user=user,
+            request=request,
+            success=False,
+            error_message=error
+        )
+        return False, error
+
+    try:
+        # Update to pending for submission
+        order.status = 'pending'
+        order.save()
+
+        # Log approval
+        log_order_activity(
+            order,
+            'order_approved',
+            user=user,
+            request=request,
+            success=True,
+            approved_by=user.email
+        )
+
+        logger.info(f"Order {order.id} approved by {user.email}")
+        return True, None
+
+    except Exception as e:
+        error_msg = str(e)
+        log_order_activity(
+            order,
+            'order_approved',
+            user=user,
+            request=request,
+            success=False,
+            error_message=error_msg
+        )
+        logger.error(f"Error approving order {order.id}: {e}")
+        return False, error_msg
+
+
+def reject_order_with_audit(order: Order, user, reason: str = '', request=None) -> tuple[bool, Optional[str]]:
+    """
+    Reject a pending order (HITL) and log to audit trail.
+
+    Args:
+        order: Order instance to reject
+        user: User rejecting the order
+        reason: Reason for rejection
+        request: HTTP request object for audit logging
+
+    Returns:
+        Tuple of (success, error_message)
+    """
+    if order.status != 'pending_approval':
+        error = f"Order not in pending_approval status: {order.status}"
+        log_order_activity(
+            order,
+            'order_rejected_user',
+            user=user,
+            request=request,
+            success=False,
+            error_message=error,
+            reason=reason
+        )
+        return False, error
+
+    try:
+        # Update to rejected
+        order.status = 'rejected'
+        order.save()
+
+        # Log rejection
+        log_order_activity(
+            order,
+            'order_rejected_user',
+            user=user,
+            request=request,
+            success=True,
+            rejected_by=user.email,
+            reason=reason
+        )
+
+        logger.info(f"Order {order.id} rejected by {user.email}. Reason: {reason}")
+        return True, None
+
+    except Exception as e:
+        error_msg = str(e)
+        log_order_activity(
+            order,
+            'order_rejected_user',
+            user=user,
+            request=request,
+            success=False,
+            error_message=error_msg,
+            reason=reason
+        )
+        logger.error(f"Error rejecting order {order.id}: {e}")
+        return False, error_msg
+
+
+def get_order_audit_history(order: Order) -> List[Dict[str, Any]]:
+    """
+    Get complete audit history for an order.
+
+    Args:
+        order: Order instance
+
+    Returns:
+        List of audit log entries
+    """
+    audit_logs = get_order_audit_trail(order)
+
+    return [
+        {
+            'id': str(log.id),
+            'action': log.action,
+            'description': log.description,
+            'timestamp': log.timestamp.isoformat(),
+            'user': log.user.email,
+            'ip_address': log.ip_address,
+            'success': log.success,
+            'error_message': log.error_message,
+            'metadata': log.metadata,
+        }
+        for log in audit_logs
+    ]

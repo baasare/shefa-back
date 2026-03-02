@@ -68,7 +68,7 @@ MIDDLEWARE = [
     'core.middleware.rate_limiting.RateLimitMiddleware',
     'django_otp.middleware.OTPMiddleware',
     'core.admin_2fa.Admin2FAMiddleware',
-    'apps.orders.audit.AuditMiddleware'
+    'apps.orders.audit.middleware.AuditMiddleware'
 ]
 
 ROOT_URLCONF = 'config.urls'

@@ -45,6 +45,20 @@ app.conf.beat_schedule = {
         'task': 'apps.notifications.tasks.send_daily_summaries_to_all',
         'schedule': crontab(hour=17, minute=0),  # 5 PM daily
     },
+    # Order monitoring
+    'monitor-pending-orders': {
+        'task': 'apps.orders.tasks.monitor_pending_orders',
+        'schedule': 30.0,  # Every 30 seconds
+    },
+    'check-stale-orders': {
+        'task': 'apps.orders.tasks.check_stale_orders',
+        'schedule': crontab(minute='*/15'),  # Every 15 minutes
+    },
+    'cleanup-old-orders': {
+        'task': 'apps.orders.tasks.cleanup_old_orders',
+        'schedule': crontab(hour=2, minute=0),  # Daily at 2 AM
+        'kwargs': {'days': 90}
+    },
 }
 
 @app.task(bind=True, ignore_result=True)

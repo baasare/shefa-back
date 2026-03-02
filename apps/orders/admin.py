@@ -3,7 +3,7 @@ Orders admin configuration.
 """
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import Order, Trade
+from apps.orders.models import Order, Trade
 
 
 @admin.register(Order)

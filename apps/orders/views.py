@@ -5,11 +5,16 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from django.utils import timezone
-from .models import Order, Trade
-from .serializers import (
+from apps.orders.models import Order, Trade
+from apps.orders.serializers import (
     OrderSerializer, OrderListSerializer,
     OrderApprovalSerializer, TradeSerializer
+)
+from apps.orders.services import (
+    approve_order_with_audit,
+    reject_order_with_audit,
+    cancel_order_with_audit,
+    get_order_audit_history
 )
 
 
@@ -33,32 +38,56 @@ class OrderViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['post'])
     def approve_order(self, request, pk=None):
-        """Approve or reject an order (HITL)."""
+        """Approve or reject an order (HITL) with audit logging."""
         order = self.get_object()
-        
+
         if order.status != 'pending_approval':
             return Response(
                 {'error': 'Order is not pending approval'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         serializer = OrderApprovalSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        
+
         action_type = serializer.validated_data['action']
-        
+
         if action_type == 'approve':
-            order.status = 'approved'
-            order.approved_by = request.user
-            order.approved_at = timezone.now()
+            # Use audit-enabled service function
+            success, error = approve_order_with_audit(
+                order,
+                request.user,
+                request=request
+            )
+
+            if not success:
+                return Response(
+                    {'error': error},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
             message = 'Order approved successfully'
         else:
-            order.status = 'rejected'
-            order.rejection_reason = serializer.validated_data.get('rejection_reason', '')
+            # Use audit-enabled service function
+            reason = serializer.validated_data.get('rejection_reason', '')
+            success, error = reject_order_with_audit(
+                order,
+                request.user,
+                reason=reason,
+                request=request
+            )
+
+            if not success:
+                return Response(
+                    {'error': error},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
             message = 'Order rejected'
-        
-        order.save()
-        
+
+        # Reload order to get updated data
+        order.refresh_from_db()
+
         return Response({
             'message': message,
             'order': OrderSerializer(order).data
@@ -66,18 +95,35 @@ class OrderViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['post'])
     def cancel(self, request, pk=None):
-        """Cancel an order."""
+        """Cancel an order with audit logging."""
         order = self.get_object()
-        
+
         if order.status not in ['pending', 'pending_approval', 'submitted']:
             return Response(
                 {'error': 'Order cannot be cancelled in current status'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
-        order.status = 'cancelled'
-        order.save()
-        
+
+        # Get cancellation reason from request
+        reason = request.data.get('reason', 'User requested cancellation')
+
+        # Use audit-enabled service function
+        success, error = cancel_order_with_audit(
+            order,
+            request.user,
+            reason=reason,
+            request=request
+        )
+
+        if not success:
+            return Response(
+                {'error': error},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Reload order to get updated data
+        order.refresh_from_db()
+
         serializer = self.get_serializer(order)
         return Response({
             'message': 'Order cancelled successfully',
@@ -99,19 +145,34 @@ class OrderViewSet(viewsets.ModelViewSet):
     def by_symbol(self, request):
         """Get orders for a specific symbol."""
         symbol = request.query_params.get('symbol', '').upper()
-        
+
         if not symbol:
             return Response(
                 {'error': 'symbol parameter is required'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         orders = self.get_queryset().filter(symbol=symbol)
         serializer = self.get_serializer(orders, many=True)
-        
+
         return Response({
             'symbol': symbol,
             'orders': serializer.data
+        })
+
+    @action(detail=True, methods=['get'])
+    def audit_trail(self, request, pk=None):
+        """Get complete audit trail for an order."""
+        order = self.get_object()
+
+        # Get audit history using service function
+        audit_history = get_order_audit_history(order)
+
+        return Response({
+            'order_id': str(order.id),
+            'symbol': order.symbol,
+            'audit': audit_history,
+            'total_events': len(audit_history)
         })
 
 

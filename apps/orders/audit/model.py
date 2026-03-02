@@ -1,0 +1,118 @@
+from django.db import models
+from django.contrib.contenttypes.models import ContentType
+from django.contrib.contenttypes.fields import GenericForeignKey
+import uuid
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class AuditLog(models.Model):
+    """
+    Immutable audit log for all trading activities.
+
+    Never delete records from this table - required for compliance.
+    """
+
+    ACTION_CHOICES = [
+        # Order actions
+        ('order_created', 'Order Created'),
+        ('order_submitted', 'Order Submitted'),
+        ('order_filled', 'Order Filled'),
+        ('order_partially_filled', 'Order Partially Filled'),
+        ('order_cancelled', 'Order Cancelled'),
+        ('order_rejected', 'Order Rejected'),
+        ('order_approved', 'Order Approved (HITL)'),
+        ('order_rejected_user', 'Order Rejected by User'),
+
+        # Trade actions
+        ('trade_executed', 'Trade Executed'),
+        ('trade_settled', 'Trade Settled'),
+
+        # Portfolio actions
+        ('position_opened', 'Position Opened'),
+        ('position_closed', 'Position Closed'),
+        ('position_updated', 'Position Updated'),
+        ('portfolio_reconciled', 'Portfolio Reconciled'),
+
+        # Strategy actions
+        ('strategy_activated', 'Strategy Activated'),
+        ('strategy_paused', 'Strategy Paused'),
+        ('strategy_executed', 'Strategy Executed'),
+        ('signal_generated', 'Signal Generated'),
+
+        # Broker actions
+        ('broker_connected', 'Broker Connected'),
+        ('broker_disconnected', 'Broker Disconnected'),
+        ('broker_error', 'Broker Error'),
+
+        # Security actions
+        ('suspicious_activity', 'Suspicious Activity Detected'),
+        ('rate_limit_exceeded', 'Rate Limit Exceeded'),
+        ('unauthorized_access', 'Unauthorized Access Attempt'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    # Who
+    user = models.ForeignKey(
+        'users.User',
+        on_delete=models.PROTECT,  # Never delete
+        related_name='audit_logs'
+    )
+
+    # What
+    action = models.CharField(max_length=50, choices=ACTION_CHOICES, db_index=True)
+    description = models.TextField()
+
+    # When
+    timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    # Where (IP address)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True)
+
+    # Related object (polymorphic)
+    content_type = models.ForeignKey(ContentType, on_delete=models.PROTECT)
+    object_id = models.CharField(max_length=255)
+    content_object = GenericForeignKey('content_type', 'object_id')
+
+    # Data snapshot (JSON)
+    data_before = models.JSONField(null=True, blank=True)
+    data_after = models.JSONField(null=True, blank=True)
+
+    # Additional context
+    metadata = models.JSONField(default=dict, blank=True)
+
+    # Result
+    success = models.BooleanField(default=True)
+    error_message = models.TextField(blank=True)
+
+    class Meta:
+        db_table = 'audit_logs'
+        verbose_name = 'Audit Log'
+        verbose_name_plural = 'Audit Logs'
+        ordering = ['-timestamp']
+        indexes = [
+            models.Index(fields=['user', '-timestamp']),
+            models.Index(fields=['action', '-timestamp']),
+            models.Index(fields=['content_type', 'object_id']),
+            models.Index(fields=['-timestamp']),
+        ]
+        # Make immutable
+        permissions = [
+            ('view_auditlog', 'Can view audit logs'),
+        ]
+
+    def __str__(self):
+        return f"{self.timestamp} - {self.user.email} - {self.action}"
+
+    def save(self, *args, **kwargs):
+        """Override save to make records immutable after creation."""
+        if self.pk is not None:
+            raise ValueError("Audit logs cannot be modified after creation")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        """Prevent deletion of audit logs."""
+        raise ValueError("Audit logs cannot be deleted")
