@@ -2,8 +2,11 @@
 Production settings
 """
 from .base import *
+from core.monitoring.sentry_config import init_sentry
 
 DEBUG = False
+
+init_sentry()
 
 allowed_hosts = config('ALLOWED_HOSTS', default='')
 ALLOWED_HOSTS = [host.strip() for host in allowed_hosts.split(',') if host.strip()]

@@ -37,6 +37,10 @@ INSTALLED_APPS = [
     'dj_rest_auth',
     'dj_rest_auth.registration',
 
+    'django_otp',
+    'django_otp.plugins.otp_totp',
+    'django_otp.plugins.otp_static',
+
     'django_celery_beat',
     'django_celery_results',
 
@@ -61,6 +65,10 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'allauth.account.middleware.AccountMiddleware',
+    'core.middleware.rate_limiting.RateLimitMiddleware',
+    'django_otp.middleware.OTPMiddleware',
+    'core.admin_2fa.Admin2FAMiddleware',
+    'apps.orders.audit.AuditMiddleware'
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -208,23 +216,5 @@ ANTHROPIC_API_KEY = config('ANTHROPIC_API_KEY', default='')
 ALPACA_API_KEY = config('ALPACA_API_KEY', default='')
 ALPACA_API_SECRET = config('ALPACA_API_SECRET', default='')
 
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'verbose': {
-            'format': '{levelname} {asctime} {module} {message}',
-            'style': '{',
-        },
-    },
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
-            'formatter': 'verbose',
-        },
-    },
-    'root': {
-        'handlers': ['console'],
-        'level': 'INFO',
-    },
-}
+# Logging configuration
+from core.monitoring.logging_config import LOGGING_CONFIG as LOGGING
