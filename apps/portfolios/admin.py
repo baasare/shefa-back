@@ -3,7 +3,7 @@ Portfolio admin configuration.
 """
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import Portfolio, Position, PortfolioSnapshot
+from apps.portfolios.models import Portfolio, Position, PortfolioSnapshot
 
 
 @admin.register(Portfolio)

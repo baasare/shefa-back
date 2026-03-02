@@ -3,7 +3,7 @@ Portfolio URL configuration.
 """
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from . import views
+from apps.portfolios import views
 
 router = DefaultRouter()
 router.register(r'portfolios', views.PortfolioViewSet, basename='portfolio')

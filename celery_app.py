@@ -59,6 +59,28 @@ app.conf.beat_schedule = {
         'schedule': crontab(hour=2, minute=0),  # Daily at 2 AM
         'kwargs': {'days': 90}
     },
+    # Portfolio snapshots - daily at market close (4:30 PM ET)
+    'create-daily-snapshots': {
+        'task': 'apps.portfolios.tasks.create_daily_snapshots',
+        'schedule': crontab(hour=16, minute=30),
+    },
+    # Update portfolio values - every 5 minutes during market hours
+    'update-all-portfolio-values': {
+        'task': 'apps.portfolios.tasks.update_all_portfolio_values',
+        'schedule': 300.0,  # 5 minutes
+    },
+    # Reconcile with broker - daily at 5 PM ET
+    'reconcile-all-portfolios': {
+        'task': 'apps.portfolios.tasks.reconcile_all_portfolios',
+        'schedule': crontab(hour=17, minute=0),
+    },
+
+    # Cleanup old snapshots - weekly on Sunday at 3 AM
+    'cleanup-old-snapshots': {
+        'task': 'apps.portfolios.tasks.cleanup_old_snapshots',
+        'schedule': crontab(hour=3, minute=0, day_of_week=0),
+        'kwargs': {'days': 365}
+    },
 }
 
 @app.task(bind=True, ignore_result=True)

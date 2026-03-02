@@ -7,11 +7,10 @@ from celery import shared_task
 from celery.utils.log import get_task_logger
 from django.utils import timezone
 from datetime import timedelta
-from typing import List
 import asyncio
 
-from .models import Portfolio, Position, PortfolioSnapshot
-from .services import (
+from apps.portfolios.models import Portfolio, Position, PortfolioSnapshot
+from apps.portfolios.services import (
     calculate_portfolio_value,
     update_portfolio_snapshot,
     calculate_position_value,
@@ -405,37 +404,3 @@ def update_all_portfolio_values(self):
     except Exception as e:
         logger.error(f"Error in update_all_portfolio_values: {e}")
         raise
-
-
-# Periodic task schedule configuration
-# Add to celeryconfig.py or settings:
-"""
-from celery.schedules import crontab
-
-CELERY_BEAT_SCHEDULE = {
-    # Portfolio snapshots - daily at market close (4:30 PM ET)
-    'create-daily-snapshots': {
-        'task': 'apps.portfolios.tasks.create_daily_snapshots',
-        'schedule': crontab(hour=16, minute=30),
-    },
-
-    # Update portfolio values - every 5 minutes during market hours
-    'update-all-portfolio-values': {
-        'task': 'apps.portfolios.tasks.update_all_portfolio_values',
-        'schedule': 300.0,  # 5 minutes
-    },
-
-    # Reconcile with broker - daily at 5 PM ET
-    'reconcile-all-portfolios': {
-        'task': 'apps.portfolios.tasks.reconcile_all_portfolios',
-        'schedule': crontab(hour=17, minute=0),
-    },
-
-    # Cleanup old snapshots - weekly on Sunday at 3 AM
-    'cleanup-old-snapshots': {
-        'task': 'apps.portfolios.tasks.cleanup_old_snapshots',
-        'schedule': crontab(hour=3, minute=0, day_of_week=0),
-        'kwargs': {'days': 365}
-    },
-}
-"""

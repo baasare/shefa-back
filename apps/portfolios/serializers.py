@@ -2,7 +2,7 @@
 Portfolio serializers for ShefaAI Trading Platform.
 """
 from rest_framework import serializers
-from .models import Portfolio, Position, PortfolioSnapshot
+from apps.portfolios.models import Portfolio, Position, PortfolioSnapshot
 from decimal import Decimal
 
 

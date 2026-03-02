@@ -10,7 +10,7 @@ from django.db.models import Sum, Avg, Q
 from django.utils import timezone
 import logging
 
-from .models import Portfolio, Position, PortfolioSnapshot
+from apps.portfolios.models import Portfolio, Position, PortfolioSnapshot
 from apps.orders.models import Trade
 from apps.market_data.cache import MarketDataCache
 from apps.market_data.provider_manager import get_provider_manager

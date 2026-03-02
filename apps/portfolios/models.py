@@ -1,10 +1,10 @@
 """
 Portfolio models for ShefaAI Trading Platform.
 """
+import uuid
+from decimal import Decimal
 from django.db import models
 from django.core.validators import MinValueValidator
-from decimal import Decimal
-import uuid
 
 
 class Portfolio(models.Model):

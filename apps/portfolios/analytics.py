@@ -1,15 +1,14 @@
 """
 Advanced portfolio analytics and reporting.
 """
-from typing import Dict, Any, List
-from decimal import Decimal
+import statistics
 from datetime import timedelta
 from django.utils import timezone
-from django.db.models import Sum, Avg, Count, Q
-import statistics
+from typing import Dict, Any, List
+from django.db.models import Sum, Avg
 
-from .models import Portfolio, Position, PortfolioSnapshot
 from apps.orders.models import Trade
+from apps.portfolios.models import Portfolio, PortfolioSnapshot
 
 
 def calculate_advanced_metrics(portfolio: Portfolio, days: int = 30) -> Dict[str, Any]:
