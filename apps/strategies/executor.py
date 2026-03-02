@@ -3,16 +3,14 @@ Strategy execution engine for manual and automated trading.
 
 Handles strategy signal generation and order placement with risk management.
 """
-from typing import Dict, Any, List, Optional
-from decimal import Decimal
-from django.db import transaction
-from django.utils import timezone
 import logging
 import asyncio
+from decimal import Decimal
+from typing import Dict, Any, List, Optional
 
-from .models import Strategy
-from .services import StrategyEvaluator, update_strategy_performance
-from apps.orders.execution import OrderExecutionEngine, OrderExecutionError
+from apps.strategies.models import Strategy
+from apps.strategies.services import StrategyEvaluator
+from apps.orders.execution import OrderExecutionEngine
 from apps.orders.models import Order
 from apps.portfolios.models import Portfolio, Position
 from apps.notifications.models import Notification

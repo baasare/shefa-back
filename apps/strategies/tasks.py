@@ -4,14 +4,14 @@ Celery tasks for strategy execution, backtesting, and monitoring.
 from celery import shared_task
 from celery.utils.log import get_task_logger
 from django.utils import timezone
-from datetime import date, timedelta
+from datetime import timedelta
 from decimal import Decimal
 import asyncio
 
-from .models import Strategy, Backtest
-from .executor import execute_strategy_sync
-from .backtest import run_backtest
-from .validator import validate_strategy
+from apps.strategies.models import Strategy, Backtest
+from apps.strategies.executor import execute_strategy_sync
+from apps.strategies.backtest import run_backtest
+from apps.strategies.validator import validate_strategy
 
 logger = get_task_logger(__name__)
 
@@ -248,26 +248,3 @@ def cleanup_old_backtests(self, days: int = 90):
     except Exception as e:
         logger.error(f"Error cleaning up backtests: {e}")
         raise
-
-
-# Celery Beat schedule configuration
-# Add to celeryconfig.py or settings:
-"""
-from celery.schedules import crontab
-
-CELERY_BEAT_SCHEDULE = {
-    # Execute active strategies every hour during market hours
-    'execute-active-strategies': {
-        'task': 'apps.strategies.tasks.execute_all_active_strategies',
-        'schedule': crontab(minute=0),  # Every hour
-        'kwargs': {'dry_run': False}
-    },
-
-    # Cleanup old backtests weekly
-    'cleanup-old-backtests': {
-        'task': 'apps.strategies.tasks.cleanup_old_backtests',
-        'schedule': crontab(hour=2, minute=0, day_of_week=0),  # Sunday 2 AM
-        'kwargs': {'days': 90}
-    },
-}
-"""

@@ -1,16 +1,13 @@
 """
 Strategy views for ShefaAI Trading Platform.
 """
-from rest_framework import viewsets, status
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
-from .models import Strategy, Backtest
-from .serializers import (
-    StrategySerializer, StrategyListSerializer,
-    BacktestSerializer
-)
+from rest_framework import viewsets, status
+from rest_framework.response import Response
+from rest_framework.decorators import action
+from apps.strategies.models import Strategy, Backtest
+from rest_framework.permissions import IsAuthenticated
+from apps.strategies.serializers import StrategySerializer, StrategyListSerializer, BacktestSerializer
 
 
 class StrategyViewSet(viewsets.ModelViewSet):

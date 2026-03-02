@@ -3,16 +3,16 @@ Backtesting engine for strategy validation and optimization.
 
 Simulates strategy execution on historical data to evaluate performance.
 """
-from typing import Dict, Any, List, Optional, Tuple
-from decimal import Decimal
-from datetime import datetime, date, timedelta
-from django.utils import timezone
-from dataclasses import dataclass, field
 import logging
 import statistics
+from datetime import date
+from decimal import Decimal
+from django.utils import timezone
+from dataclasses import dataclass, field
+from typing import Dict, Any, List, Optional, Tuple
 
-from .models import Strategy, Backtest
-from .services import StrategyEvaluator
+from apps.strategies.models import Strategy, Backtest
+from apps.strategies.services import StrategyEvaluator
 from apps.market_data.provider_manager import get_provider_manager
 
 logger = logging.getLogger(__name__)
@@ -52,11 +52,11 @@ class BacktestEngine:
     """
 
     def __init__(
-        self,
-        strategy: Strategy,
-        start_date: date,
-        end_date: date,
-        initial_capital: Decimal
+            self,
+            strategy: Strategy,
+            start_date: date,
+            end_date: date,
+            initial_capital: Decimal
     ):
         """
         Initialize backtest engine.
@@ -158,7 +158,9 @@ class BacktestEngine:
                     # Add date field for easier lookup
                     for bar in bars:
                         if 'date' not in bar:
-                            bar['date'] = bar.get('timestamp', self.start_date).date() if hasattr(bar.get('timestamp', self.start_date), 'date') else bar.get('timestamp', self.start_date)
+                            bar['date'] = bar.get('timestamp', self.start_date).date() if hasattr(
+                                bar.get('timestamp', self.start_date), 'date') else bar.get('timestamp',
+                                                                                            self.start_date)
 
                     historical_data[symbol] = bars
                     logger.debug(f"Fetched {len(bars)} bars for {symbol}")
@@ -169,9 +171,9 @@ class BacktestEngine:
         return historical_data
 
     async def _simulate_trading_day(
-        self,
-        current_date: date,
-        historical_data: Dict[str, List[Dict[str, Any]]]
+            self,
+            current_date: date,
+            historical_data: Dict[str, List[Dict[str, Any]]]
     ):
         """
         Simulate trading for a single day.
@@ -191,9 +193,9 @@ class BacktestEngine:
             await self._check_entry_conditions(current_date, historical_data)
 
     async def _check_entry_conditions(
-        self,
-        current_date: date,
-        historical_data: Dict[str, List[Dict[str, Any]]]
+            self,
+            current_date: date,
+            historical_data: Dict[str, List[Dict[str, Any]]]
     ):
         """Check entry conditions and open new positions."""
         for symbol in self.strategy.watchlist:
@@ -244,9 +246,9 @@ class BacktestEngine:
                         logger.debug(f"Opened position: {symbol} @ ${current_price} ({quantity} shares)")
 
     async def _check_exit_conditions(
-        self,
-        current_date: date,
-        historical_data: Dict[str, List[Dict[str, Any]]]
+            self,
+            current_date: date,
+            historical_data: Dict[str, List[Dict[str, Any]]]
     ):
         """Check exit conditions and close positions."""
         symbols_to_close = []
@@ -285,10 +287,10 @@ class BacktestEngine:
             del self.positions[symbol]
 
     async def _evaluate_exit_conditions(
-        self,
-        trade: BacktestTrade,
-        current_price: Decimal,
-        bars: List[Dict[str, Any]]
+            self,
+            trade: BacktestTrade,
+            current_price: Decimal,
+            bars: List[Dict[str, Any]]
     ) -> Tuple[bool, List[str]]:
         """Evaluate exit conditions for a trade."""
         exit_rules = self.strategy.exit_rules
@@ -333,9 +335,9 @@ class BacktestEngine:
         return should_exit, reasons
 
     async def _close_all_positions(
-        self,
-        final_date: date,
-        historical_data: Dict[str, List[Dict[str, Any]]]
+            self,
+            final_date: date,
+            historical_data: Dict[str, List[Dict[str, Any]]]
     ):
         """Close all remaining open positions at end of backtest."""
         for symbol, trade in list(self.positions.items()):
@@ -358,10 +360,10 @@ class BacktestEngine:
         self.positions = {}
 
     def _get_bars_up_to_date(
-        self,
-        symbol: str,
-        current_date: date,
-        historical_data: Dict[str, List[Dict[str, Any]]]
+            self,
+            symbol: str,
+            current_date: date,
+            historical_data: Dict[str, List[Dict[str, Any]]]
     ) -> List[Dict[str, Any]]:
         """Get bars for symbol up to current date."""
         if symbol not in historical_data:
@@ -379,9 +381,9 @@ class BacktestEngine:
         return quantity
 
     def _record_equity_state(
-        self,
-        current_date: date,
-        historical_data: Dict[str, List[Dict[str, Any]]]
+            self,
+            current_date: date,
+            historical_data: Dict[str, List[Dict[str, Any]]]
     ):
         """Record current equity state."""
         # Calculate positions value
@@ -430,7 +432,7 @@ class BacktestEngine:
         # Calculate daily returns for Sharpe ratio
         daily_returns = []
         for i in range(1, len(self.equity_curve)):
-            prev_value = float(self.equity_curve[i-1].total_value)
+            prev_value = float(self.equity_curve[i - 1].total_value)
             curr_value = float(self.equity_curve[i].total_value)
             if prev_value > 0:
                 daily_return = (curr_value - prev_value) / prev_value
@@ -458,7 +460,8 @@ class BacktestEngine:
             'win_rate': win_rate,
             'avg_win': avg_win,
             'avg_loss': avg_loss,
-            'avg_trade_pnl': sum(t.pnl for t in self.closed_trades) / len(self.closed_trades) if self.closed_trades else Decimal('0')
+            'avg_trade_pnl': sum(t.pnl for t in self.closed_trades) / len(
+                self.closed_trades) if self.closed_trades else Decimal('0')
         }
 
     def _calculate_sharpe_ratio(self, daily_returns: List[float], risk_free_rate: float = 0.04) -> Optional[Decimal]:
@@ -593,10 +596,10 @@ class BacktestEngine:
 
 
 async def run_backtest(
-    strategy: Strategy,
-    start_date: date,
-    end_date: date,
-    initial_capital: Decimal
+        strategy: Strategy,
+        start_date: date,
+        end_date: date,
+        initial_capital: Decimal
 ) -> Backtest:
     """
     Convenience function to run a backtest.

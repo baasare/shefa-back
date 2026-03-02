@@ -3,14 +3,13 @@ Strategy evaluation and management services.
 
 Provides strategy rule evaluation, signal generation, and performance tracking.
 """
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Tuple
 from decimal import Decimal
-from datetime import datetime, timedelta
+from datetime import timedelta
 from django.utils import timezone
-from django.db.models import Avg, Sum
 import logging
 
-from .models import Strategy
+from apps.strategies.models import Strategy
 from apps.market_data.indicators import (
     calculate_rsi, calculate_macd, calculate_bollinger_bands,
     calculate_sma, calculate_ema, calculate_atr, calculate_stochastic,

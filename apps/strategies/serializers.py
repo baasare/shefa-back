@@ -2,7 +2,7 @@
 Strategy serializers for ShefaAI Trading Platform.
 """
 from rest_framework import serializers
-from .models import Strategy, Backtest
+from apps.strategies.models import Strategy, Backtest
 
 
 class BacktestSerializer(serializers.ModelSerializer):

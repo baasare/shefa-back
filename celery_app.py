@@ -81,6 +81,18 @@ app.conf.beat_schedule = {
         'schedule': crontab(hour=3, minute=0, day_of_week=0),
         'kwargs': {'days': 365}
     },
+    # Execute active strategies every hour during market hours
+    'execute-active-strategies': {
+        'task': 'apps.strategies.tasks.execute_all_active_strategies',
+        'schedule': crontab(minute=0),  # Every hour
+        'kwargs': {'dry_run': False}
+    },
+    # Cleanup old backtests weekly
+    'cleanup-old-backtests': {
+        'task': 'apps.strategies.tasks.cleanup_old_backtests',
+        'schedule': crontab(hour=2, minute=0, day_of_week=0),  # Sunday 2 AM
+        'kwargs': {'days': 90}
+    },
 }
 
 @app.task(bind=True, ignore_result=True)

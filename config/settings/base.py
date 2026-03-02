@@ -132,6 +132,8 @@ AUTH_USER_MODEL = 'users.User'
 
 SITE_ID = 1
 
+FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:3000')
+
 REST_FRAMEWORK = {
     'DEFAULT_RENDERER_CLASSES': ('rest_framework.renderers.JSONRenderer',),
     'DEFAULT_AUTHENTICATION_CLASSES': (
