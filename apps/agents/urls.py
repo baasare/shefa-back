@@ -1,12 +1,15 @@
 """
-Agent URLs
+Agent URL configuration.
 """
-from django.urls import path
-from apps.agents.views import TradingAgentStreamView, AgentListView
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from . import views
 
-app_name = 'agents'
+router = DefaultRouter()
+router.register(r'runs', views.AgentRunViewSet, basename='agentrun')
+router.register(r'decisions', views.AgentDecisionViewSet, basename='agentdecision')
+router.register(r'logs', views.AgentLogViewSet, basename='agentlog')
 
 urlpatterns = [
-    path('', AgentListView.as_view(), name='agent-list'),
-    path('stream/', TradingAgentStreamView.as_view(), name='agent-stream'),
+    path('', include(router.urls)),
 ]

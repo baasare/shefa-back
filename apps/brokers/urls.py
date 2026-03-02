@@ -1,4 +1,13 @@
-from django.urls import path
+"""
+Broker URL configuration.
+"""
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from . import views
 
-app_name = 'brokers'
-urlpatterns = []
+router = DefaultRouter()
+router.register(r'connections', views.BrokerConnectionViewSet, basename='brokerconnection')
+
+urlpatterns = [
+    path('', include(router.urls)),
+]

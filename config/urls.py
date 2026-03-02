@@ -20,12 +20,8 @@ urlpatterns = [
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
     path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
 
-    # Authentication (dj-rest-auth)
-    path('api/auth/', include('dj_rest_auth.urls')),
-    path('api/auth/registration/', include('dj_rest_auth.registration.urls')),
-
-    # App URLs
-    path('api/users/', include('apps.users.urls')),
+    # App URLs (includes authentication)
+    path('api/', include('apps.users.urls')),  # Includes /api/auth/ endpoints
     path('api/agents/', include('apps.agents.urls')),
     path('api/portfolios/', include('apps.portfolios.urls')),
     path('api/strategies/', include('apps.strategies.urls')),
