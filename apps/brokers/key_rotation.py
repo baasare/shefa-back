@@ -3,12 +3,10 @@ Encryption key rotation system for secure credential management.
 
 Allows rotating encryption keys without downtime by supporting multiple keys.
 """
-from typing import List, Optional
-from cryptography.fernet import Fernet, MultiFernet
-from django.conf import settings
-from django.core.management.base import BaseCommand
-import os
 import logging
+from typing import List
+from decouple import config
+from cryptography.fernet import Fernet, MultiFernet
 
 logger = logging.getLogger(__name__)
 
@@ -36,15 +34,15 @@ class KeyRotationManager:
         """
         keys = []
 
-        # Primary key (required)
-        primary_key = os.environ.get('ENCRYPTION_KEY')
+        # Primary key
+        primary_key = config('ENCRYPTION_KEY', default=None)
         if not primary_key:
             raise ValueError("ENCRYPTION_KEY environment variable is required")
         keys.append(primary_key)
 
-        # Old keys (optional, for rotation)
+        # Old keys
         for i in range(1, 6):  # Support up to 5 old keys
-            old_key = os.environ.get(f'ENCRYPTION_KEY_OLD_{i}')
+            old_key = config(f'ENCRYPTION_KEY_OLD_{i}', default=None)
             if old_key:
                 keys.append(old_key)
 
@@ -152,46 +150,6 @@ def rotate_broker_credentials():
     return rotated_count, error_count
 
 
-# Update encryption.py to use KeyRotationManager
-def encrypt_broker_credentials(api_key: str, api_secret: str) -> tuple:
-    """
-    Encrypt broker credentials.
-
-    Args:
-        api_key: Plain API key
-        api_secret: Plain API secret
-
-    Returns:
-        Tuple of (encrypted_key, encrypted_secret)
-    """
-    manager = get_key_manager()
-    return (
-        manager.encrypt(api_key),
-        manager.encrypt(api_secret)
-    )
-
-
-def decrypt_broker_credentials(
-    encrypted_key: str,
-    encrypted_secret: str
-) -> dict:
-    """
-    Decrypt broker credentials.
-
-    Args:
-        encrypted_key: Encrypted API key
-        encrypted_secret: Encrypted API secret
-
-    Returns:
-        Dictionary with decrypted credentials
-    """
-    manager = get_key_manager()
-    return {
-        'api_key': manager.decrypt(encrypted_key),
-        'api_secret': manager.decrypt(encrypted_secret)
-    }
-
-
 def generate_new_key() -> str:
     """
     Generate a new Fernet encryption key.
@@ -200,64 +158,3 @@ def generate_new_key() -> str:
         Base64-encoded encryption key
     """
     return Fernet.generate_key().decode()
-
-
-# Management command for key rotation
-class Command(BaseCommand):
-    """
-    Django management command to rotate encryption keys.
-
-    Usage:
-        # Generate new key
-        python manage.py rotate_keys --generate
-
-        # Rotate existing credentials to new key
-        python manage.py rotate_keys --rotate
-    """
-    help = 'Manage encryption key rotation'
-
-    def add_arguments(self, parser):
-        parser.add_argument(
-            '--generate',
-            action='store_true',
-            help='Generate a new encryption key'
-        )
-        parser.add_argument(
-            '--rotate',
-            action='store_true',
-            help='Rotate all credentials to new primary key'
-        )
-
-    def handle(self, *args, **options):
-        if options['generate']:
-            new_key = generate_new_key()
-            self.stdout.write(self.style.SUCCESS(
-                f"\nNew encryption key generated:\n{new_key}\n"
-            ))
-            self.stdout.write(self.style.WARNING(
-                "\nTo rotate keys:\n"
-                "1. Set ENCRYPTION_KEY_OLD_1 to current ENCRYPTION_KEY in .env\n"
-                "2. Set ENCRYPTION_KEY to new key above in .env\n"
-                "3. Restart application\n"
-                "4. Run: python manage.py rotate_keys --rotate\n"
-                "5. After 24 hours, remove ENCRYPTION_KEY_OLD_1 from .env\n"
-            ))
-
-        elif options['rotate']:
-            self.stdout.write("Starting key rotation...")
-            rotated, errors = rotate_broker_credentials()
-
-            if errors == 0:
-                self.stdout.write(self.style.SUCCESS(
-                    f"Successfully rotated {rotated} broker connections"
-                ))
-            else:
-                self.stdout.write(self.style.ERROR(
-                    f"Rotation completed with {errors} errors. "
-                    f"{rotated} connections rotated successfully."
-                ))
-
-        else:
-            self.stdout.write(self.style.ERROR(
-                "Please specify --generate or --rotate"
-            ))

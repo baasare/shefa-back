@@ -2,7 +2,8 @@
 Broker serializers for ShefaAI Trading Platform.
 """
 from rest_framework import serializers
-from .models import BrokerConnection
+from apps.brokers.models import BrokerConnection
+from apps.brokers.encryption import encrypt_api_key, decrypt_api_key
 
 
 class BrokerConnectionSerializer(serializers.ModelSerializer):
@@ -41,25 +42,32 @@ class BrokerConnectionSerializer(serializers.ModelSerializer):
         """Create broker connection with encrypted credentials."""
         api_key = validated_data.pop('api_key', None)
         api_secret = validated_data.pop('api_secret', '')
-        
-        # TODO: Implement proper encryption
-        # For now, just store as-is (NOT PRODUCTION READY!)
-        validated_data['api_key_encrypted'] = api_key or ''
-        validated_data['api_secret_encrypted'] = api_secret
+
+        # Encrypt credentials before storing
+        if api_key:
+            validated_data['api_key_encrypted'] = encrypt_api_key(api_key)
+        else:
+            validated_data['api_key_encrypted'] = ''
+
+        if api_secret:
+            validated_data['api_secret_encrypted'] = encrypt_api_key(api_secret)
+        else:
+            validated_data['api_secret_encrypted'] = ''
+
         validated_data['user'] = self.context['request'].user
         validated_data['status'] = 'inactive'
-        
+
         return super().create(validated_data)
     
     def update(self, instance, validated_data):
         """Update broker connection."""
         api_key = validated_data.pop('api_key', None)
         api_secret = validated_data.pop('api_secret', None)
-        
-        # Update credentials if provided
+
+        # Update and encrypt credentials if provided
         if api_key:
-            instance.api_key_encrypted = api_key  # TODO: Encrypt
+            instance.api_key_encrypted = encrypt_api_key(api_key)
         if api_secret:
-            instance.api_secret_encrypted = api_secret  # TODO: Encrypt
-        
+            instance.api_secret_encrypted = encrypt_api_key(api_secret)
+
         return super().update(instance, validated_data)

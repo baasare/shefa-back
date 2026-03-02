@@ -7,10 +7,10 @@ handle credential decryption, and manage broker lifecycle.
 from typing import Optional
 import logging
 
-from .models import BrokerConnection
-from .clients import AlpacaClient
-from .clients.base import BrokerClient
-from .encryption import decrypt_broker_credentials
+from apps.brokers.clients import AlpacaClient
+from apps.brokers.models import BrokerConnection
+from apps.brokers.clients.base import BrokerClient
+from apps.brokers.encryption import decrypt_broker_credentials
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ def get_broker_client(broker_connection: BrokerConnection) -> BrokerClient:
         >>> client = get_broker_client(connection)
         >>> account = await client.get_account_info()
     """
-    if not broker_connection.is_active:
+    if broker_connection.status != 'active':
         raise ValueError(f"Broker connection {broker_connection.id} is not active")
 
     # Decrypt credentials
@@ -84,7 +84,7 @@ def get_active_broker_connection(user, broker: Optional[str] = None) -> Optional
         >>> if connection:
         >>>     client = get_broker_client(connection)
     """
-    query = BrokerConnection.objects.filter(user=user, is_active=True)
+    query = BrokerConnection.objects.filter(user=user, status='active')
 
     if broker:
         query = query.filter(broker=broker)
@@ -117,10 +117,11 @@ def verify_broker_connection(broker_connection: BrokerConnection) -> dict:
         import asyncio
         account_info = asyncio.run(client.get_account_info())
 
-        # Update connection metadata
-        broker_connection.metadata = broker_connection.metadata or {}
-        broker_connection.metadata['last_verified'] = str(account_info.get('account_number', ''))
-        broker_connection.metadata['last_verified_at'] = None  # Will be set by save
+        # Update connection info
+        if account_info.get('account_number'):
+            broker_connection.account_number = account_info['account_number']
+        broker_connection.status = 'active'
+        broker_connection.last_error = ''
         broker_connection.save()
 
         logger.info(f"Verified broker connection {broker_connection.id}")
@@ -154,9 +155,11 @@ async def async_verify_broker_connection(broker_connection: BrokerConnection) ->
         client = get_broker_client(broker_connection)
         account_info = await client.get_account_info()
 
-        # Update connection metadata
-        broker_connection.metadata = broker_connection.metadata or {}
-        broker_connection.metadata['last_verified'] = str(account_info.get('account_number', ''))
+        # Update connection info
+        if account_info.get('account_number'):
+            broker_connection.account_number = account_info['account_number']
+        broker_connection.status = 'active'
+        broker_connection.last_error = ''
         broker_connection.save()
 
         logger.info(f"Verified broker connection {broker_connection.id}")
@@ -192,7 +195,7 @@ def get_user_broker_clients(user) -> dict:
         >>> if alpaca_client:
         >>>     positions = await alpaca_client.get_positions()
     """
-    connections = BrokerConnection.objects.filter(user=user, is_active=True)
+    connections = BrokerConnection.objects.filter(user=user, status='active')
     clients = {}
 
     for connection in connections:

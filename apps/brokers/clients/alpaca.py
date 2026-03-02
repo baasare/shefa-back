@@ -12,13 +12,12 @@ from alpaca.trading.requests import (
     StopLimitOrderRequest,
     GetOrdersRequest
 )
-from alpaca.trading.enums import OrderSide, OrderType, TimeInForce, QueryOrderStatus
+from alpaca.trading.enums import OrderSide, TimeInForce, QueryOrderStatus
 from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockLatestQuoteRequest
 
 from typing import Dict, List, Any, Optional
 from decimal import Decimal
-from datetime import datetime
 import logging
 
 from .base import BrokerClient

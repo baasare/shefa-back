@@ -216,5 +216,13 @@ ANTHROPIC_API_KEY = config('ANTHROPIC_API_KEY', default='')
 ALPACA_API_KEY = config('ALPACA_API_KEY', default='')
 ALPACA_API_SECRET = config('ALPACA_API_SECRET', default='')
 
+# Encryption key rotation configuration
+ENCRYPTION_KEY = config('ENCRYPTION_KEY', default=None)
+ENCRYPTION_KEY_OLD_1 = config('ENCRYPTION_KEY_OLD_1', default=None)
+ENCRYPTION_KEY_OLD_2 = config('ENCRYPTION_KEY_OLD_2', default=None)
+ENCRYPTION_KEY_OLD_3 = config('ENCRYPTION_KEY_OLD_3', default=None)
+ENCRYPTION_KEY_OLD_4 = config('ENCRYPTION_KEY_OLD_4', default=None)
+ENCRYPTION_KEY_OLD_5 = config('ENCRYPTION_KEY_OLD_5', default=None)
+
 # Logging configuration
 from core.monitoring.logging_config import LOGGING_CONFIG as LOGGING

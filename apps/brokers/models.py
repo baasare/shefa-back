@@ -1,8 +1,9 @@
 """
 Broker models for ShefaAI Trading Platform.
 """
-from django.db import models
 import uuid
+from django.db import models
+from apps.brokers.encryption import decrypt_api_key
 
 
 class BrokerConnection(models.Model):
@@ -55,3 +56,15 @@ class BrokerConnection(models.Model):
 
     def __str__(self):
         return f'{self.user.email} - {self.broker}'
+
+    def get_decrypted_credentials(self):
+        """
+        Get decrypted API credentials.
+
+        Returns:
+            dict: {'api_key': str, 'api_secret': str}
+        """
+        return {
+            'api_key': decrypt_api_key(self.api_key_encrypted) if self.api_key_encrypted else '',
+            'api_secret': decrypt_api_key(self.api_secret_encrypted) if self.api_secret_encrypted else ''
+        }
