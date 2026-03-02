@@ -8,10 +8,13 @@ from celery.schedules import crontab
 # Set default Django settings module
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 
-app = Celery('shefa')
+app = Celery('config')
 
 # Load config from Django settings with CELERY namespace
 app.config_from_object('django.conf:settings', namespace='CELERY')
+
+# Reconnect on startup
+app.conf.broker_connection_retry_on_startup = True
 
 # Auto-discover tasks in all installed apps
 app.autodiscover_tasks()
