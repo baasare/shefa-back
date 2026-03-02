@@ -68,12 +68,13 @@ class MarketDataProvider(ABC):
         pass
 
     @abstractmethod
-    async def search_symbols(self, query: str) -> List[Dict[str, Any]]:
+    async def search_symbols(self, query: str, market: str) -> List[Dict[str, Any]]:
         """
         Search for symbols matching query.
 
         Args:
             query: Search query string
+            market: Market type (e.g., 'stocks', 'crypto', 'fx', 'otc', 'indices')
 
         Returns:
             List of matching symbols with metadata

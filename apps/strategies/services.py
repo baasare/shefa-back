@@ -13,7 +13,8 @@ import logging
 from .models import Strategy
 from apps.market_data.indicators import (
     calculate_rsi, calculate_macd, calculate_bollinger_bands,
-    calculate_sma, calculate_ema, calculate_atr, calculate_stochastic
+    calculate_sma, calculate_ema, calculate_atr, calculate_stochastic,
+    detect_crossover, detect_support_resistance, calculate_volume_profile
 )
 from apps.market_data.cache import MarketDataCache
 from apps.market_data.provider_manager import get_provider_manager
@@ -218,6 +219,50 @@ class StrategyEvaluator:
             indicators['stoch_k'] = stoch_data['%K'][-1] if stoch_data['%K'] else None
             indicators['stoch_d'] = stoch_data['%D'][-1] if stoch_data['%D'] else None
 
+        # Crossover Detection (MA crossovers)
+        if config.get('use_crossover', True):
+            if indicators.get('ema_12') and indicators.get('ema_26'):
+                ema_12_series = calculate_ema(closes, 12)
+                ema_26_series = calculate_ema(closes, 26)
+                crossover_signals = detect_crossover(ema_12_series, ema_26_series)
+                indicators['ma_crossover'] = crossover_signals[-1] if crossover_signals else 0
+                indicators['ma_crossover_history'] = crossover_signals[-5:] if len(crossover_signals) >= 5 else crossover_signals
+
+        # Support/Resistance Levels
+        if config.get('use_support_resistance', True):
+            window = config.get('sr_window', 20)
+            sr_levels = detect_support_resistance(highs, lows, closes, window=window)
+            indicators['support_levels'] = sr_levels.get('support', [])
+            indicators['resistance_levels'] = sr_levels.get('resistance', [])
+
+            # Determine if current price is near support/resistance
+            current_price = closes[-1]
+            if sr_levels.get('support'):
+                nearest_support = max([s for s in sr_levels['support'] if s < current_price], default=None)
+                if nearest_support:
+                    support_distance_pct = ((current_price - nearest_support) / current_price) * 100
+                    indicators['nearest_support'] = nearest_support
+                    indicators['support_distance_pct'] = support_distance_pct
+
+            if sr_levels.get('resistance'):
+                nearest_resistance = min([r for r in sr_levels['resistance'] if r > current_price], default=None)
+                if nearest_resistance:
+                    resistance_distance_pct = ((nearest_resistance - current_price) / current_price) * 100
+                    indicators['nearest_resistance'] = nearest_resistance
+                    indicators['resistance_distance_pct'] = resistance_distance_pct
+
+        # Volume Profile
+        if config.get('use_volume_profile', True):
+            num_bins = config.get('vp_bins', 20)
+            volume_profile = calculate_volume_profile(closes, volumes, num_bins=num_bins)
+            indicators['volume_profile'] = volume_profile
+            indicators['poc'] = volume_profile.get('poc')  # Point of Control
+
+            # Determine if current price is near POC
+            if volume_profile.get('poc'):
+                poc_distance_pct = ((closes[-1] - volume_profile['poc']) / closes[-1]) * 100
+                indicators['poc_distance_pct'] = poc_distance_pct
+
         # Volume
         indicators['volume'] = volumes[-1] if volumes else None
         indicators['avg_volume'] = sum(volumes[-20:]) / min(20, len(volumes)) if volumes else None
@@ -306,6 +351,58 @@ class StrategyEvaluator:
                 if bb_upper and price >= bb_upper * 0.99:  # Within 1% of upper band
                     conditions_met += 1
                     reasons.append("Price near Bollinger upper band")
+
+            elif rule_name == 'ma_bullish_crossover':
+                # EMA12 crosses above EMA26
+                crossover = indicators.get('ma_crossover')
+                if crossover == 1:
+                    conditions_met += 1
+                    reasons.append("Bullish MA crossover detected")
+
+            elif rule_name == 'ma_bearish_crossover':
+                # EMA12 crosses below EMA26
+                crossover = indicators.get('ma_crossover')
+                if crossover == -1:
+                    conditions_met += 1
+                    reasons.append("Bearish MA crossover detected")
+
+            elif rule_name == 'price_near_support':
+                # Price is within threshold % of nearest support
+                threshold_pct = rule_config.get('threshold_pct', 2.0)
+                support_distance = indicators.get('support_distance_pct')
+                if support_distance and support_distance <= threshold_pct:
+                    conditions_met += 1
+                    reasons.append(f"Price near support ({support_distance:.2f}% away)")
+
+            elif rule_name == 'price_near_resistance':
+                # Price is within threshold % of nearest resistance
+                threshold_pct = rule_config.get('threshold_pct', 2.0)
+                resistance_distance = indicators.get('resistance_distance_pct')
+                if resistance_distance and resistance_distance <= threshold_pct:
+                    conditions_met += 1
+                    reasons.append(f"Price near resistance ({resistance_distance:.2f}% away)")
+
+            elif rule_name == 'price_at_poc':
+                # Price is near Point of Control (high volume area)
+                threshold_pct = rule_config.get('threshold_pct', 1.5)
+                poc_distance = indicators.get('poc_distance_pct')
+                if poc_distance and abs(poc_distance) <= threshold_pct:
+                    conditions_met += 1
+                    reasons.append(f"Price near POC ({abs(poc_distance):.2f}% away)")
+
+            elif rule_name == 'breakout_above_resistance':
+                # Price breaks above resistance level
+                nearest_resistance = indicators.get('nearest_resistance')
+                if nearest_resistance and float(current_price) > nearest_resistance:
+                    conditions_met += 1
+                    reasons.append(f"Breakout above resistance (${nearest_resistance:.2f})")
+
+            elif rule_name == 'breakdown_below_support':
+                # Price breaks below support level
+                nearest_support = indicators.get('nearest_support')
+                if nearest_support and float(current_price) < nearest_support:
+                    conditions_met += 1
+                    reasons.append(f"Breakdown below support (${nearest_support:.2f})")
 
         # Check if required conditions met
         required_conditions = entry_rules.get('_required_conditions', total_conditions)

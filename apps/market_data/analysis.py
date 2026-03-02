@@ -3,8 +3,7 @@ Chart analysis and pattern detection.
 
 Provides technical chart pattern recognition and trend analysis.
 """
-from typing import Dict, Any, List, Optional, Tuple
-from decimal import Decimal
+from typing import Dict, Any, List
 import numpy as np
 import logging
 

@@ -1,9 +1,8 @@
 """
 Market Data models for ShefaAI Trading Platform.
 """
-from django.db import models
-from decimal import Decimal
 import uuid
+from django.db import models
 
 
 class Quote(models.Model):

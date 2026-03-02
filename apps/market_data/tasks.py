@@ -1,50 +1,27 @@
 """
 Celery tasks for market data synchronization.
 """
-from celery import shared_task
-from django.conf import settings
-from django.utils import timezone
-from datetime import datetime, timedelta, date
 import logging
 import asyncio
+from celery import shared_task
+from django.utils import timezone
+from datetime import datetime, timedelta, date
 
-from .models import Quote, Indicator
-from .provider_manager import get_provider_manager, fetch_quote_with_fallback, fetch_historical_with_fallback
-from .indicators import (
+from apps.market_data.models import Quote, Indicator
+from apps.market_data.provider_manager import get_provider_manager
+from apps.market_data.indicators import (
     calculate_rsi,
     calculate_macd,
     calculate_bollinger_bands,
     calculate_sma,
     calculate_ema,
-    calculate_atr
+    calculate_atr,
+    detect_crossover,
+    detect_support_resistance,
+    calculate_volume_profile
 )
-from .providers import MassiveProvider, AlphaVantageProvider
 
 logger = logging.getLogger(__name__)
-
-
-def get_market_data_provider(provider_name: str = 'massive'):
-    """
-    Get configured market data provider.
-
-    Args:
-        provider_name: Provider name ('massive' or 'alpha_vantage')
-
-    Returns:
-        Provider instance
-    """
-    if provider_name == 'massive':
-        api_key = getattr(settings, 'MASSIVE_API_KEY', None)
-        if not api_key:
-            raise ValueError("MASSIVE_API_KEY not configured")
-        return MassiveProvider(api_key)
-    elif provider_name == 'alpha_vantage':
-        api_key = getattr(settings, 'ALPHA_VANTAGE_API_KEY', None)
-        if not api_key:
-            raise ValueError("ALPHA_VANTAGE_API_KEY not configured")
-        return AlphaVantageProvider(api_key)
-    else:
-        raise ValueError(f"Unknown provider: {provider_name}")
 
 
 def get_all_watched_symbols():
@@ -64,6 +41,57 @@ def get_all_watched_symbols():
         symbols.update(watchlist)
 
     return list(symbols)
+
+
+def _save_indicators(symbol, timestamps, values, indicator_type, parameters):
+    """Save indicator values to database."""
+    for timestamp, value in zip(timestamps, values):
+        if value is None or (isinstance(value, float) and not value):
+            continue
+
+        try:
+            Indicator.objects.update_or_create(
+                symbol=symbol,
+                indicator_type=indicator_type,
+                timestamp=timestamp,
+                parameters=parameters,
+                defaults={'value': value}
+            )
+        except Exception as e:
+            logger.error(f"Error saving indicator: {e}")
+            continue
+
+
+def _save_quote_data(quote_data):
+    """
+    Save quote data to database.
+
+    Args:
+        quote_data: Dictionary containing quote information
+
+    Returns:
+        True if saved successfully, False otherwise
+    """
+    if not quote_data:
+        return False
+
+    try:
+        Quote.objects.update_or_create(
+            symbol=quote_data.get('symbol'),
+            timestamp=quote_data.get('timestamp'),
+            source=quote_data.get('source'),
+            defaults={
+                'open': quote_data.get('open', 0),
+                'high': quote_data.get('high', 0),
+                'low': quote_data.get('low', 0),
+                'close': quote_data.get('close', 0),
+                'volume': quote_data.get('volume', 0),
+            }
+        )
+        return True
+    except Exception as e:
+        logger.error(f"Error saving quote for {quote_data.get('symbol')}: {e}", exc_info=True)
+        return False
 
 
 @shared_task(bind=True, max_retries=3)
@@ -88,7 +116,7 @@ def sync_latest_quotes(self, symbols: list = None, use_cache: bool = True):
 
         logger.info(f"Syncing latest quotes for {len(symbols)} symbols (cache: {use_cache})")
 
-        # Get provider manager with fallback
+        # Get a provider manager with fallback
         manager = get_provider_manager()
 
         # Fetch quotes (async with fallback)
@@ -99,30 +127,12 @@ def sync_latest_quotes(self, symbols: list = None, use_cache: bool = True):
         )
         loop.close()
 
-        # Save to database
+        # Save to the database
         saved_count = 0
         for quote_data in quotes:
-            if not quote_data:
-                continue
-
-            try:
-                Quote.objects.update_or_create(
-                    symbol=quote_data['symbol'],
-                    timestamp=quote_data['timestamp'],
-                    source=quote_data['source'],
-                    defaults={
-                        'open': quote_data['open'],
-                        'high': quote_data['high'],
-                        'low': quote_data['low'],
-                        'close': quote_data['close'],
-                        'volume': quote_data['volume'],
-                    }
-                )
+            if _save_quote_data(quote_data):
                 saved_count += 1
                 logger.debug(f"Saved quote for {quote_data['symbol']}")
-            except Exception as e:
-                logger.error(f"Error saving quote for {quote_data.get('symbol')}: {e}", exc_info=True)
-                continue
 
         logger.info(f"Successfully synced {saved_count}/{len(symbols)} quotes")
 
@@ -140,12 +150,12 @@ def sync_latest_quotes(self, symbols: list = None, use_cache: bool = True):
 
 @shared_task(bind=True, max_retries=2)
 def sync_historical_bars(
-    self,
-    symbol: str,
-    start_date: str,
-    end_date: str,
-    timeframe: str = '1D',
-    use_cache: bool = True
+        self,
+        symbol: str,
+        start_date: str,
+        end_date: str,
+        timeframe: str = '1D',
+        use_cache: bool = True
 ):
     """
     Sync historical bars for a symbol with automatic fallback.
@@ -164,7 +174,7 @@ def sync_historical_bars(
         start = datetime.strptime(start_date, '%Y-%m-%d').date()
         end = datetime.strptime(end_date, '%Y-%m-%d').date()
 
-        # Get provider manager with fallback
+        # Get the provider manager with fallback
         manager = get_provider_manager()
 
         # Fetch historical bars (async with fallback)
@@ -175,29 +185,11 @@ def sync_historical_bars(
         )
         loop.close()
 
-        # Save to database
+        # Save to a database
         saved_count = 0
         for bar_data in bars:
-            if not bar_data:
-                continue
-
-            try:
-                Quote.objects.update_or_create(
-                    symbol=bar_data['symbol'],
-                    timestamp=bar_data['timestamp'],
-                    source=bar_data['source'],
-                    defaults={
-                        'open': bar_data['open'],
-                        'high': bar_data['high'],
-                        'low': bar_data['low'],
-                        'close': bar_data['close'],
-                        'volume': bar_data['volume'],
-                    }
-                )
+            if _save_quote_data(bar_data):
                 saved_count += 1
-            except Exception as e:
-                logger.error(f"Error saving bar for {symbol}: {e}", exc_info=True)
-                continue
 
         logger.info(f"Successfully synced {saved_count} bars for {symbol}")
 
@@ -243,35 +235,73 @@ def calculate_indicators_for_symbol(self, symbol: str, period_days: int = 100):
         closes = [float(q.close) for q in quotes]
         highs = [float(q.high) for q in quotes]
         lows = [float(q.low) for q in quotes]
+        volumes = [int(q.volume) for q in quotes]
         timestamps = [q.timestamp for q in quotes]
 
         # Calculate RSI
         rsi_values = calculate_rsi(closes, period=14)
-        self._save_indicators(symbol, timestamps, rsi_values, 'rsi', {'period': 14})
+        _save_indicators(symbol, timestamps, rsi_values, 'rsi', {'period': 14})
 
         # Calculate MACD
-        macd_line, signal_line, histogram = calculate_macd(closes)
-        self._save_indicators(symbol, timestamps, macd_line, 'macd', {'type': 'macd_line'})
-        self._save_indicators(symbol, timestamps, signal_line, 'macd', {'type': 'signal_line'})
+        macd_data = calculate_macd(closes)
+        _save_indicators(symbol, timestamps, macd_data['macd'], 'macd', {'type': 'macd_line'})
+        _save_indicators(symbol, timestamps, macd_data['signal'], 'macd', {'type': 'signal_line'})
+        _save_indicators(symbol, timestamps, macd_data['histogram'], 'macd', {'type': 'histogram'})
 
         # Calculate Bollinger Bands
-        upper, middle, lower = calculate_bollinger_bands(closes)
-        self._save_indicators(symbol, timestamps, upper, 'bollinger', {'type': 'upper', 'period': 20})
-        self._save_indicators(symbol, timestamps, middle, 'bollinger', {'type': 'middle', 'period': 20})
-        self._save_indicators(symbol, timestamps, lower, 'bollinger', {'type': 'lower', 'period': 20})
+        bb_data = calculate_bollinger_bands(closes)
+        _save_indicators(symbol, timestamps, bb_data['upper'], 'bollinger', {'type': 'upper', 'period': 20})
+        _save_indicators(symbol, timestamps, bb_data['middle'], 'bollinger', {'type': 'middle', 'period': 20})
+        _save_indicators(symbol, timestamps, bb_data['lower'], 'bollinger', {'type': 'lower', 'period': 20})
 
         # Calculate moving averages
         sma_20 = calculate_sma(closes, period=20)
         sma_50 = calculate_sma(closes, period=50)
-        ema_20 = calculate_ema(closes, period=20)
+        ema_12 = calculate_ema(closes, period=12)
+        ema_26 = calculate_ema(closes, period=26)
 
-        self._save_indicators(symbol, timestamps, sma_20, 'sma', {'period': 20})
-        self._save_indicators(symbol, timestamps, sma_50, 'sma', {'period': 50})
-        self._save_indicators(symbol, timestamps, ema_20, 'ema', {'period': 20})
+        _save_indicators(symbol, timestamps, sma_20, 'sma', {'period': 20})
+        _save_indicators(symbol, timestamps, sma_50, 'sma', {'period': 50})
+        _save_indicators(symbol, timestamps, ema_12, 'ema', {'period': 12})
+        _save_indicators(symbol, timestamps, ema_26, 'ema', {'period': 26})
 
         # Calculate ATR
         atr_values = calculate_atr(highs, lows, closes, period=14)
-        self._save_indicators(symbol, timestamps, atr_values, 'atr', {'period': 14})
+        _save_indicators(symbol, timestamps, atr_values, 'atr', {'period': 14})
+
+        # Detect MA Crossovers (EMA12 vs EMA26)
+        crossover_signals = detect_crossover(ema_12, ema_26)
+        _save_indicators(symbol, timestamps, crossover_signals, 'crossover', {'type': 'ema_12_26'})
+
+        # Detect Support/Resistance Levels (calculate once for latest data)
+        sr_levels = detect_support_resistance(highs, lows, closes, window=20)
+        if sr_levels.get('support') or sr_levels.get('resistance'):
+            # Store as JSON in the last timestamp
+            import json
+            sr_data = {
+                'support': sr_levels.get('support', []),
+                'resistance': sr_levels.get('resistance', [])
+            }
+            _save_indicators(
+                symbol=symbol,
+                indicator_type='support_resistance',
+                timestamps=timestamps,
+                parameters={'window': 20},
+                values=json.dumps(sr_data)
+            )
+        # Calculate Volume Profile (for latest data)
+        volume_profile = calculate_volume_profile(closes, volumes, num_bins=20)
+        if volume_profile.get('poc'):
+            try:
+                _save_indicators(
+                    symbol=symbol,
+                    indicator_type='volume_profile',
+                    timestamps=timestamps,
+                    parameters={'num_bins': 20},
+                    values= volume_profile.get('poc')
+                )
+            except Exception as e:
+                logger.error(f"Error saving volume profile for {symbol}: {e}")
 
         logger.info(f"Successfully calculated indicators for {symbol}")
 
@@ -285,34 +315,15 @@ def calculate_indicators_for_symbol(self, symbol: str, period_days: int = 100):
         logger.error(f"Error calculating indicators for {symbol}: {exc}")
         raise
 
-    def _save_indicators(self, symbol, timestamps, values, indicator_type, parameters):
-        """Save indicator values to database."""
-        for timestamp, value in zip(timestamps, values):
-            if value is None or (isinstance(value, float) and not value):
-                continue
-
-            try:
-                Indicator.objects.update_or_create(
-                    symbol=symbol,
-                    indicator_type=indicator_type,
-                    timestamp=timestamp,
-                    parameters=parameters,
-                    defaults={'value': value}
-                )
-            except Exception as e:
-                logger.error(f"Error saving indicator: {e}")
-                continue
-
 
 @shared_task
-def backfill_historical_data(symbol: str, days: int = 365, provider: str = 'massive'):
+def backfill_historical_data(symbol: str, days: int = 365):
     """
     Backfill historical data for a symbol.
 
     Args:
         symbol: Stock symbol
         days: Number of days to backfill (default 365)
-        provider: Data provider to use
     """
     try:
         end_date = date.today()
@@ -325,7 +336,6 @@ def backfill_historical_data(symbol: str, days: int = 365, provider: str = 'mass
             start_date=start_date.strftime('%Y-%m-%d'),
             end_date=end_date.strftime('%Y-%m-%d'),
             timeframe='1D',
-            provider=provider
         )
 
         return {"status": "queued", "symbol": symbol, "days": days}

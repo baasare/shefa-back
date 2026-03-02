@@ -2,23 +2,22 @@
 Market Data admin configuration with custom actions for manual data sync.
 """
 from django.contrib import admin, messages
+from django.contrib.admin import helpers
 from django.utils.html import format_html
 from django.urls import path
 from django.shortcuts import render, redirect
 from django.http import JsonResponse
-from datetime import datetime, timedelta, date
 import logging
 
-from .models import Quote, Indicator
-from .tasks import (
+from apps.market_data.models import Quote, Indicator
+from apps.market_data.tasks import (
     sync_latest_quotes,
-    sync_historical_bars,
     calculate_indicators_for_symbol,
     backfill_historical_data,
-    cleanup_old_quotes
+    cleanup_old_quotes,
 )
-from .cache import MarketDataCache
-from .provider_manager import get_provider_manager
+from apps.market_data.cache import MarketDataCache
+from apps.market_data.provider_manager import get_provider_manager
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +41,8 @@ class QuoteAdmin(admin.ModelAdmin):
     actions = [
         'sync_selected_symbols',
         'invalidate_cache_for_symbols',
-        'calculate_indicators_for_symbols'
+        'calculate_indicators_for_symbols',
+        'cleanup_old_quotes_action'
     ]
 
     def close_formatted(self, obj):
@@ -106,6 +106,49 @@ class QuoteAdmin(admin.ModelAdmin):
         )
 
     calculate_indicators_for_symbols.short_description = "📊 Calculate indicators for selected"
+
+    def cleanup_old_quotes_action(self, request, queryset):
+        """Cleanup old quotes older than specified days."""
+        # Use a custom form to get days_to_keep parameter
+        if 'apply' in request.POST:
+            days_to_keep = int(request.POST.get('days_to_keep', 365))
+
+            # Queue Celery task
+            task = cleanup_old_quotes.delay(days_to_keep=days_to_keep)
+
+            self.message_user(
+                request,
+                f"Queued cleanup task to delete quotes older than {days_to_keep} days (Task ID: {task.id})",
+                messages.SUCCESS
+            )
+            return None
+
+        # Show confirmation form
+        from django import forms
+
+        class CleanupForm(forms.Form):
+            days_to_keep = forms.IntegerField(
+                initial=365,
+                min_value=1,
+                max_value=3650,
+                label="Days to keep",
+                help_text="Delete quotes older than this many days"
+            )
+
+        form = CleanupForm()
+
+        context = {
+            **self.admin_site.each_context(request),
+            'title': 'Cleanup Old Quotes',
+            'queryset': queryset,
+            'form': form,
+            'action': 'cleanup_old_quotes_action',
+            'action_checkbox_name': helpers.ACTION_CHECKBOX_NAME,
+        }
+
+        return render(request, 'admin/market_data/cleanup_old_quotes.html', context)
+
+    cleanup_old_quotes_action.short_description = "🗑️ Cleanup old quotes (bulk)"
 
     def get_urls(self):
         """Add custom admin URLs."""

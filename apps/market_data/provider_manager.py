@@ -4,14 +4,14 @@ Market data provider manager with fallback logic.
 This module provides intelligent provider selection and automatic fallback
 when primary providers fail or hit rate limits.
 """
-from typing import List, Dict, Any, Optional
-from datetime import datetime, date
-from django.conf import settings
 import logging
 import asyncio
+from datetime import date
+from django.conf import settings
+from typing import List, Dict, Any, Optional
 
-from .providers import MassiveProvider, AlphaVantageProvider, MarketDataProvider
-from .cache import MarketDataCache
+from apps.market_data.providers import MassiveProvider, AlphaVantageProvider, MarketDataProvider
+from apps.market_data.cache import MarketDataCache
 
 logger = logging.getLogger(__name__)
 

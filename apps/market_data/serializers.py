@@ -2,7 +2,7 @@
 Market Data serializers for ShefaAI Trading Platform.
 """
 from rest_framework import serializers
-from .models import Quote, Indicator
+from apps.market_data.models import Quote, Indicator
 
 
 class QuoteSerializer(serializers.ModelSerializer):

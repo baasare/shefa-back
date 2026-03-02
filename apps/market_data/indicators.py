@@ -5,10 +5,7 @@ This module provides functions to calculate common technical indicators
 like RSI, MACD, Bollinger Bands, etc.
 """
 import pandas as pd
-import numpy as np
-from typing import List, Dict, Any, Optional, Tuple
-from decimal import Decimal
-from datetime import datetime
+from typing import List, Dict, Any, Tuple
 
 
 def calculate_rsi(prices: List[float], period: int = 14) -> List[float]:

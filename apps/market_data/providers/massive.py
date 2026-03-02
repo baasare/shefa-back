@@ -1,7 +1,7 @@
 """
 Massive.com (formerly Polygon.io) market data provider.
 
-Documentation: https://polygon.io/docs/stocks/getting-started
+Documentation: https://massive.com/docs/rest/quickstart
 """
 import httpx
 from typing import List, Dict, Any, Optional
@@ -9,14 +9,14 @@ from datetime import datetime, date
 from decimal import Decimal
 import logging
 
-from .base import MarketDataProvider
+from apps.market_data.providers.base import MarketDataProvider
 
 logger = logging.getLogger(__name__)
 
 
 class MassiveProvider(MarketDataProvider):
     """
-    Massive.com (Polygon.io) market data provider.
+    Massive.com (formerly Polygon.io) market data provider.
 
     Free tier includes:
     - Real-time quotes (15-minute delay)
@@ -24,32 +24,32 @@ class MassiveProvider(MarketDataProvider):
     - Stock aggregates (bars)
     """
 
-    BASE_URL = "https://api.polygon.io"
+    BASE_URL = "https://api.massive.com"
 
     def __init__(self, api_key: str):
         """
         Initialize Massive.com provider.
 
         Args:
-            api_key: Polygon.io API key
+            api_key: Massive.com API key (legacy Polygon.io keys still work)
         """
         super().__init__(api_key)
         self.client = httpx.AsyncClient(timeout=30.0)
 
     async def get_quote(self, symbol: str) -> Dict[str, Any]:
         """
-        Get latest quote for a symbol.
+        Get latest NBBO (National Best Bid and Offer) quote for a symbol.
 
         Args:
             symbol: Stock symbol (e.g., 'AAPL')
 
         Returns:
-            Quote dictionary
+            Quote dictionary with bid/ask prices, sizes, and timestamps
         """
         if not self.validate_symbol(symbol):
             raise ValueError(f"Invalid symbol: {symbol}")
 
-        url = f"{self.BASE_URL}/v2/aggs/ticker/{symbol}/prev"
+        url = f"{self.BASE_URL}/v2/last/nbbo/{symbol}"
         params = {"apiKey": self.api_key}
 
         try:
@@ -58,11 +58,11 @@ class MassiveProvider(MarketDataProvider):
             data = response.json()
 
             if data.get("status") != "OK" or not data.get("results"):
-                logger.warning(f"No data found for symbol {symbol}")
+                logger.warning(f"No quote data found for symbol {symbol}")
                 return None
 
-            result = data["results"][0]
-            return self._normalize_bar(symbol, result)
+            result = data["results"]
+            return self._normalize_quote(symbol, result)
 
         except httpx.HTTPError as e:
             logger.error(f"HTTP error fetching quote for {symbol}: {e}")
@@ -75,7 +75,7 @@ class MassiveProvider(MarketDataProvider):
         """
         Get latest quotes for multiple symbols.
 
-        Note: Polygon doesn't have a true batch endpoint for free tier,
+        Note: Massive.com doesn't have a true batch endpoint for free tier,
         so we make individual requests.
 
         Args:
@@ -153,12 +153,13 @@ class MassiveProvider(MarketDataProvider):
             logger.error(f"Error fetching historical data for {symbol}: {e}")
             raise
 
-    async def search_symbols(self, query: str) -> List[Dict[str, Any]]:
+    async def search_symbols(self, query: str, market: str) -> List[Dict[str, Any]]:
         """
         Search for symbols.
 
         Args:
             query: Search query
+            market: Market type (e.g., 'stocks', 'crypto', 'fx', 'otc', 'indices')
 
         Returns:
             List of matching symbols
@@ -166,9 +167,12 @@ class MassiveProvider(MarketDataProvider):
         url = f"{self.BASE_URL}/v3/reference/tickers"
         params = {
             "apiKey": self.api_key,
-            "search": query,
+            "ticker": query,
+            "market": market,
             "active": "true",
-            "limit": 20
+            "order": "asc",
+            "limit": 50,
+            "sort": "ticker"
         }
 
         try:
@@ -200,18 +204,52 @@ class MassiveProvider(MarketDataProvider):
         """Get provider name."""
         return "massive"
 
-    def _normalize_bar(self, symbol: str, bar_data: Dict[str, Any]) -> Dict[str, Any]:
+    def _normalize_quote(self, symbol: str, quote_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Normalize Polygon bar data to standard format.
+        Normalize Massive.com quote data to standard format.
 
         Args:
             symbol: Stock symbol
-            bar_data: Raw bar data from Polygon
+            quote_data: Raw quote data from Massive.com Last Quote endpoint
+
+        Returns:
+            Normalized quote dictionary
+        """
+        # Timestamp is in nanoseconds, convert to datetime
+        timestamp_ns = quote_data.get("t")
+        timestamp = datetime.fromtimestamp(timestamp_ns / 1_000_000_000) if timestamp_ns else None
+
+        return {
+            "symbol": symbol,
+            "timestamp": timestamp,
+            "bid_price": Decimal(str(quote_data.get("p", 0))),
+            "bid_size": int(quote_data.get("s", 0)),
+            "ask_price": Decimal(str(quote_data.get("P", 0))),
+            "ask_size": int(quote_data.get("S", 0)),
+            "bid_exchange_id": quote_data.get("x"),
+            "ask_exchange_id": quote_data.get("X"),
+            "sequence_number": quote_data.get("q"),
+            "sip_timestamp": datetime.fromtimestamp(quote_data["t"] / 1_000_000_000) if quote_data.get("t") else None,
+            "participant_timestamp": datetime.fromtimestamp(quote_data["y"] / 1_000_000_000) if quote_data.get("y") else None,
+            "trf_timestamp": datetime.fromtimestamp(quote_data["f"] / 1_000_000_000) if quote_data.get("f") else None,
+            "tape": quote_data.get("z"),
+            "conditions": quote_data.get("c", []),
+            "indicators": quote_data.get("i", []),
+            "source": self.get_provider_name(),
+        }
+
+    def _normalize_bar(self, symbol: str, bar_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Normalize Massive.com bar data to standard format.
+
+        Args:
+            symbol: Stock symbol
+            bar_data: Raw bar data from Massive.com
 
         Returns:
             Normalized bar dictionary
         """
-        # Polygon timestamp is in milliseconds
+        # Massive.com timestamp is in milliseconds
         timestamp_ms = bar_data.get("t")
         timestamp = datetime.fromtimestamp(timestamp_ms / 1000) if timestamp_ms else None
 
@@ -228,7 +266,7 @@ class MassiveProvider(MarketDataProvider):
 
     def _parse_timeframe(self, timeframe: str) -> tuple:
         """
-        Parse timeframe string to Polygon format.
+        Parse timeframe string to Massive.com format.
 
         Args:
             timeframe: Timeframe like '1Min', '5Min', '1H', '1D'

@@ -4,13 +4,12 @@ Redis caching utilities for market data.
 This module provides caching functions to reduce API calls to market data providers
 and improve response times.
 """
-from django.core.cache import cache
-from django.conf import settings
-from typing import Optional, Dict, Any, List
-from datetime import datetime, timedelta
-from decimal import Decimal
 import json
 import logging
+from decimal import Decimal
+from datetime import datetime
+from django.core.cache import cache
+from typing import Optional, Dict, Any, List
 
 logger = logging.getLogger(__name__)
 
@@ -432,7 +431,7 @@ class MarketDataCache:
             logger.error(f"Error getting cache stats: {e}")
             return {"connected": False, "error": str(e)}
 
-
+# decorator to cache quote fetching functions
 def cache_quote(func):
     """
     Decorator to cache quote fetching functions.
@@ -460,7 +459,7 @@ def cache_quote(func):
 
     return wrapper
 
-
+# decorator to cache bars fetching functions
 def cache_bars(func):
     """
     Decorator to cache historical bars fetching.

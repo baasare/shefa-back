@@ -1,0 +1,78 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block title %}Cleanup Old Quotes{% endblock %}
+
+{% block content %}
+<h1>Cleanup Old Quotes</h1>
+
+<div style="max-width: 600px; margin: 20px 0;">
+    <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 15px; margin-bottom: 20px;">
+        <h3 style="margin: 0 0 10px 0; color: #856404;">⚠️ Warning</h3>
+        <p style="margin: 0; color: #856404;">
+            This action will permanently delete quotes older than the specified number of days.
+            This operation cannot be undone.
+        </p>
+    </div>
+
+    <form method="post" style="background: #f8f9fa; padding: 20px; border-radius: 8px;">
+        {% csrf_token %}
+
+        <input type="hidden" name="action" value="cleanup_old_quotes_action">
+        {{ action_checkbox_name }}
+
+        <div style="margin-bottom: 20px;">
+            <label for="{{ form.days_to_keep.id_for_label }}" style="display: block; margin-bottom: 8px; font-weight: bold;">
+                {{ form.days_to_keep.label }}
+            </label>
+            <input
+                type="number"
+                name="days_to_keep"
+                id="{{ form.days_to_keep.id_for_label }}"
+                value="{{ form.days_to_keep.value }}"
+                min="{{ form.days_to_keep.field.min_value }}"
+                max="{{ form.days_to_keep.field.max_value }}"
+                style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;"
+            >
+            <small style="display: block; margin-top: 4px; color: #666;">
+                {{ form.days_to_keep.help_text }}
+            </small>
+        </div>
+
+        <div style="margin-bottom: 20px; padding: 15px; background: #e7f3ff; border: 1px solid #b3d9ff; border-radius: 4px;">
+            <p style="margin: 0; font-size: 14px; color: #004085;">
+                <strong>Example:</strong> If you set this to <strong>365 days</strong>, all quotes older than
+                {{ 365|timesince }} from today will be deleted.
+            </p>
+        </div>
+
+        <div style="display: flex; gap: 10px;">
+            <button
+                type="submit"
+                name="apply"
+                style="background: #dc3545; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold;"
+                onclick="return confirm('Are you sure you want to delete old quotes? This action cannot be undone.');"
+            >
+                🗑️ Delete Old Quotes
+            </button>
+
+            <a
+                href="{% url 'admin:market_data_quote_changelist' %}"
+                style="background: #6c757d; color: white; text-decoration: none; padding: 10px 20px; border-radius: 4px; font-size: 14px; font-weight: bold; display: inline-block;"
+            >
+                Cancel
+            </a>
+        </div>
+    </form>
+
+    <div style="margin-top: 30px; padding: 15px; background: #f8f9fa; border-left: 4px solid #17a2b8; border-radius: 4px;">
+        <h4 style="margin: 0 0 10px 0; color: #17a2b8;">💡 Tip</h4>
+        <ul style="margin: 0; padding-left: 20px; color: #666;">
+            <li>This task runs asynchronously via Celery</li>
+            <li>You'll receive a task ID when the cleanup is queued</li>
+            <li>Check Celery logs to monitor the cleanup progress</li>
+            <li>Recommended: Keep at least 365 days of data for accurate backtesting</li>
+        </ul>
+    </div>
+</div>
+{% endblock %}
