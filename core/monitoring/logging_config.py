@@ -328,18 +328,3 @@ LOGGING_CONFIG = {
         'level': 'INFO',
     },
 }
-
-
-# Usage in settings.py:
-"""
-from core.monitoring.logging_config import LOGGING_CONFIG, setup_logging
-
-# Use Django's LOGGING configuration
-LOGGING = LOGGING_CONFIG
-
-# Or use custom setup
-setup_logging(
-    log_dir='logs',
-    environment=os.environ.get('ENVIRONMENT', 'development')
-)
-"""

@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from django.db.models import Q, Count, Sum, Avg
 from django.utils import timezone
 import logging
+import sentry_sdk
 
 from .models import Order, Trade
 from apps.portfolios.models import Portfolio
@@ -18,6 +19,22 @@ from apps.orders.audit.trail import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def capture_order_context(order: Order):
+    """Add order context to Sentry for error tracking."""
+    sentry_sdk.set_context("order", {
+        "order_id": str(order.id),
+        "symbol": order.symbol,
+        "side": order.side,
+        "type": order.type,
+        "status": order.status,
+        "quantity": order.quantity,
+        "limit_price": float(order.limit_price) if order.limit_price else None,
+        "filled_qty": order.filled_qty,
+        "portfolio_id": order.portfolio_id,
+        "broker_order_id": order.broker_order_id,
+    })
 
 
 def get_user_orders(
@@ -513,6 +530,12 @@ def cancel_order_with_audit(order: Order, user, reason: str = '', request=None) 
 
     except Exception as e:
         error_msg = str(e)
+
+        # Capture context for Sentry
+        capture_order_context(order)
+        sentry_sdk.set_user({"id": user.id, "email": user.email})
+        sentry_sdk.capture_exception(e)
+
         log_order_activity(
             order,
             'order_cancelled',
@@ -570,6 +593,12 @@ def approve_order_with_audit(order: Order, user, request=None) -> tuple[bool, Op
 
     except Exception as e:
         error_msg = str(e)
+
+        # Capture context for Sentry
+        capture_order_context(order)
+        sentry_sdk.set_user({"id": user.id, "email": user.email})
+        sentry_sdk.capture_exception(e)
+
         log_order_activity(
             order,
             'order_approved',
@@ -629,6 +658,12 @@ def reject_order_with_audit(order: Order, user, reason: str = '', request=None) 
 
     except Exception as e:
         error_msg = str(e)
+
+        # Capture context for Sentry
+        capture_order_context(order)
+        sentry_sdk.set_user({"id": user.id, "email": user.email})
+        sentry_sdk.capture_exception(e)
+
         log_order_activity(
             order,
             'order_rejected_user',

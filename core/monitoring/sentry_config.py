@@ -194,33 +194,3 @@ class BrokerConnectionError(TradingSystemError):
 class StrategyEvaluationError(TradingSystemError):
     """Raised when strategy evaluation fails."""
     pass
-
-
-# Example usage in views/services:
-"""
-from core.monitoring.sentry_config import capture_order_context
-import sentry_sdk
-
-try:
-    order = execute_order(...)
-except Exception as e:
-    capture_order_context(order)
-    sentry_sdk.capture_exception(e)
-    raise
-"""
-
-# Configuration for settings.py:
-"""
-# In settings.py
-
-from core.monitoring.sentry_config import init_sentry
-
-# Initialize Sentry
-if not DEBUG:
-    init_sentry()
-
-# Environment variables needed:
-SENTRY_DSN=https://your-sentry-dsn@sentry.io/project-id
-ENVIRONMENT=production
-GIT_COMMIT_SHA=abc123def456
-"""

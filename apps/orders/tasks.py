@@ -8,6 +8,7 @@ from celery import shared_task
 from datetime import timedelta
 from django.utils import timezone
 from celery.utils.log import get_task_logger
+import sentry_sdk
 
 from apps.orders.models import Order
 from apps.brokers.models import BrokerConnection
@@ -16,6 +17,22 @@ from apps.brokers.services import get_broker_client
 from apps.orders.execution import OrderExecutionEngine, OrderExecutionError
 
 logger = get_task_logger(__name__)
+
+
+def capture_order_context(order: Order):
+    """Add order context to Sentry for error tracking."""
+    sentry_sdk.set_context("order", {
+        "order_id": str(order.id),
+        "symbol": order.symbol,
+        "side": order.side,
+        "type": order.type,
+        "status": order.status,
+        "quantity": order.quantity,
+        "limit_price": float(order.limit_price) if order.limit_price else None,
+        "filled_qty": order.filled_qty,
+        "portfolio_id": order.portfolio_id,
+        "broker_order_id": order.broker_order_id,
+    })
 
 
 @shared_task(bind=True, max_retries=3)
@@ -84,9 +101,18 @@ def update_order_status(self, order_id: int):
 
     except Order.DoesNotExist:
         logger.error(f"Order {order_id} not found")
+        sentry_sdk.capture_message(f"Order {order_id} not found", level="error")
 
     except Exception as e:
+        # Try to get order for context
+        try:
+            order = Order.objects.get(id=order_id)
+            capture_order_context(order)
+        except:
+            pass
+
         logger.error(f"Error updating order {order_id} status: {e}")
+        sentry_sdk.capture_exception(e)
         raise self.retry(exc=e, countdown=60)
 
 
@@ -169,13 +195,17 @@ def cancel_order_async(self, order_id: int):
 
     except Order.DoesNotExist:
         logger.error(f"Order {order_id} not found")
+        sentry_sdk.capture_message(f"Order {order_id} not found for cancellation", level="error")
         return {'success': False, 'error': 'Order not found'}
 
     except OrderExecutionError as e:
         logger.error(f"Error cancelling order {order_id}: {e}")
-        # Log failed cancellation attempt
+        # Log failed cancellation attempt and capture context
         try:
             order = Order.objects.get(id=order_id)
+            capture_order_context(order)
+            sentry_sdk.capture_exception(e)
+
             log_order_activity(
                 order,
                 'order_cancelled',
@@ -189,7 +219,15 @@ def cancel_order_async(self, order_id: int):
         return {'success': False, 'error': str(e)}
 
     except Exception as e:
+        # Capture order context if possible
+        try:
+            order = Order.objects.get(id=order_id)
+            capture_order_context(order)
+        except:
+            pass
+
         logger.error(f"Unexpected error cancelling order {order_id}: {e}")
+        sentry_sdk.capture_exception(e)
         raise self.retry(exc=e, countdown=30)
 
 
