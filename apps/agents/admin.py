@@ -2,7 +2,7 @@
 Agents admin configuration.
 """
 from django.contrib import admin
-from .models import AgentRun, AgentDecision, AgentLog
+from apps.agents.models import AgentRun, AgentDecision, AgentLog
 
 
 @admin.register(AgentRun)

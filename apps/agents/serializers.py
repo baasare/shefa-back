@@ -2,7 +2,7 @@
 Agent serializers for ShefaAI Trading Platform.
 """
 from rest_framework import serializers
-from .models import AgentRun, AgentDecision, AgentLog
+from apps.agents.models import AgentRun, AgentDecision, AgentLog
 
 
 class AgentLogSerializer(serializers.ModelSerializer):
