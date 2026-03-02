@@ -371,6 +371,182 @@ class AlphaVantageProvider(MarketDataProvider):
 
         return None
 
+    async def get_news_sentiment(
+        self,
+        tickers: Optional[List[str]] = None,
+        topics: Optional[List[str]] = None,
+        time_from: Optional[str] = None,
+        time_to: Optional[str] = None,
+        sort: str = "LATEST",
+        limit: int = 50
+    ) -> Dict[str, Any]:
+        """
+        Get news and sentiment data for stocks.
+
+        Alpha Vantage News Sentiment API provides real-time and historical
+        news articles with AI-powered sentiment analysis.
+
+        Args:
+            tickers: List of stock symbols (e.g., ['AAPL', 'GOOGL'])
+            topics: List of topics (e.g., ['technology', 'earnings'])
+            time_from: Start time in YYYYMMDDTHHMM format
+            time_to: End time in YYYYMMDDTHHMM format
+            sort: Sort order - LATEST, EARLIEST, or RELEVANCE
+            limit: Number of results (default 50, max 1000)
+
+        Returns:
+            Dictionary containing news articles with sentiment scores
+
+        Sentiment Score Interpretation:
+            x <= -0.35: Bearish
+            -0.35 < x <= -0.15: Somewhat Bearish
+            -0.15 < x < 0.15: Neutral
+            0.15 <= x < 0.35: Somewhat Bullish
+            x >= 0.35: Bullish
+        """
+        params = {
+            "function": "NEWS_SENTIMENT",
+            "apikey": self.api_key,
+            "sort": sort,
+            "limit": limit
+        }
+
+        # Add tickers filter
+        if tickers:
+            params["tickers"] = ",".join(tickers)
+
+        # Add topics filter
+        if topics:
+            params["topics"] = ",".join(topics)
+
+        # Add time range
+        if time_from:
+            params["time_from"] = time_from
+        if time_to:
+            params["time_to"] = time_to
+
+        try:
+            response = await self.client.get(self.BASE_URL, params=params)
+            response.raise_for_status()
+            data = response.json()
+
+            # Check for errors
+            if "Error Message" in data:
+                logger.error(f"Alpha Vantage error: {data['Error Message']}")
+                raise ValueError(data["Error Message"])
+
+            if "Note" in data:
+                logger.warning(f"Alpha Vantage rate limit: {data['Note']}")
+                raise ValueError("API rate limit exceeded")
+
+            # Process news feed
+            feed = data.get("feed", [])
+            processed_news = []
+
+            for article in feed:
+                processed_article = self._normalize_news_article(article, tickers)
+                processed_news.append(processed_article)
+
+            logger.info(f"Fetched {len(processed_news)} news articles")
+
+            return {
+                "items": len(processed_news),
+                "sentiment_score_definition": data.get("sentiment_score_definition"),
+                "relevance_score_definition": data.get("relevance_score_definition"),
+                "feed": processed_news
+            }
+
+        except httpx.HTTPError as e:
+            logger.error(f"HTTP error fetching news sentiment: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"Error fetching news sentiment: {e}")
+            raise
+
+    def _normalize_news_article(
+        self,
+        article: Dict[str, Any],
+        filter_tickers: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
+        """
+        Normalize news article data from Alpha Vantage.
+
+        Args:
+            article: Raw article data
+            filter_tickers: Tickers to filter sentiment for
+
+        Returns:
+            Normalized article dictionary
+        """
+        # Extract overall sentiment
+        overall_sentiment = article.get("overall_sentiment_score", 0)
+        overall_label = article.get("overall_sentiment_label", "Neutral")
+
+        # Extract ticker-specific sentiment
+        ticker_sentiments = []
+        for ticker_data in article.get("ticker_sentiment", []):
+            ticker = ticker_data.get("ticker")
+
+            # Only include filtered tickers if specified
+            if filter_tickers and ticker not in filter_tickers:
+                continue
+
+            ticker_sentiments.append({
+                "ticker": ticker,
+                "relevance_score": float(ticker_data.get("relevance_score", 0)),
+                "sentiment_score": float(ticker_data.get("ticker_sentiment_score", 0)),
+                "sentiment_label": ticker_data.get("ticker_sentiment_label", "Neutral")
+            })
+
+        # Parse time published
+        time_published = article.get("time_published", "")
+        try:
+            published_dt = datetime.strptime(time_published, "%Y%m%dT%H%M%S")
+        except:
+            published_dt = datetime.now()
+
+        return {
+            "title": article.get("title", ""),
+            "url": article.get("url", ""),
+            "time_published": published_dt,
+            "authors": article.get("authors", []),
+            "summary": article.get("summary", ""),
+            "source": article.get("source", ""),
+            "category_within_source": article.get("category_within_source", ""),
+            "source_domain": article.get("source_domain", ""),
+            "topics": [
+                {
+                    "topic": topic.get("topic"),
+                    "relevance_score": float(topic.get("relevance_score", 0))
+                }
+                for topic in article.get("topics", [])
+            ],
+            "overall_sentiment_score": float(overall_sentiment),
+            "overall_sentiment_label": overall_label,
+            "ticker_sentiment": ticker_sentiments
+        }
+
+    def interpret_sentiment_score(self, score: float) -> str:
+        """
+        Interpret sentiment score into a label.
+
+        Args:
+            score: Sentiment score between -1 and 1
+
+        Returns:
+            Sentiment label
+        """
+        if score <= -0.35:
+            return "Bearish"
+        elif -0.35 < score <= -0.15:
+            return "Somewhat Bearish"
+        elif -0.15 < score < 0.15:
+            return "Neutral"
+        elif 0.15 <= score < 0.35:
+            return "Somewhat Bullish"
+        else:
+            return "Bullish"
+
     async def close(self):
         """Close HTTP client."""
         await self.client.aclose()

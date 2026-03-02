@@ -13,7 +13,7 @@ from decimal import Decimal
 from datetime import timedelta
 import json
 
-from apps.strategies.models import Strategy, Backtest, StrategyExecution
+from apps.strategies.models import Strategy, Backtest
 from apps.strategies.services import (
     evaluate_entry_conditions,
     evaluate_exit_conditions,

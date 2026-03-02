@@ -21,10 +21,10 @@ app.autodiscover_tasks()
 
 # Celery Beat schedule for autonomous trading
 app.conf.beat_schedule = {
-    # Run active agents every minute during market hours
-    'run-active-agents': {
-        'task': 'apps.agents.tasks.run_all_active_agents',
-        'schedule': 60.0,  # Every 60 seconds
+    # Run periodic agent scan every 15 minutes during market hours (9:30 AM - 4:00 PM ET, Mon-Fri)
+    'run-periodic-agent-scan': {
+        'task': 'apps.agents.tasks.run_periodic_agent_scan',
+        'schedule': crontab(minute='*/15', hour='9-16', day_of_week='1-5'),  # Every 15 min during market hours
     },
     # Sync market data every 30 seconds
     'sync-market-data': {
