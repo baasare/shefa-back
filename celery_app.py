@@ -41,6 +41,10 @@ app.conf.beat_schedule = {
         'task': 'apps.strategies.tasks.validate_all_strategies',
         'schedule': crontab(day_of_week=6, hour=10, minute=0),  # Saturday 10 AM
     },
+    'send-daily-summaries': {
+        'task': 'apps.notifications.tasks.send_daily_summaries_to_all',
+        'schedule': crontab(hour=17, minute=0),  # 5 PM daily
+    },
 }
 
 @app.task(bind=True, ignore_result=True)

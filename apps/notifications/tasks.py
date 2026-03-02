@@ -2,13 +2,11 @@
 Notification tasks for email, SMS, and push notifications.
 """
 from celery import shared_task
-from celery.utils.log import get_task_logger
-from django.core.mail import send_mail, EmailMultiAlternatives
 from django.conf import settings
-from django.template.loader import render_to_string
-from django.utils import timezone
+from django.core.mail import send_mail
+from celery.utils.log import get_task_logger
 
-from .models import Notification
+from apps.notifications.models import Notification
 
 logger = get_task_logger(__name__)
 
@@ -256,17 +254,6 @@ def send_strategy_signal_alert(self, strategy_id: str, symbol: str, signal: str)
     except Exception as e:
         logger.error(f"Error sending strategy signal alert: {e}")
         raise
-
-
-# Celery Beat schedule for periodic notifications
-"""
-CELERY_BEAT_SCHEDULE = {
-    'send-daily-summaries': {
-        'task': 'apps.notifications.tasks.send_daily_summaries_to_all',
-        'schedule': crontab(hour=17, minute=0),  # 5 PM daily
-    },
-}
-"""
 
 
 @shared_task(bind=True)

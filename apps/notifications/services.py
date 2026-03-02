@@ -2,7 +2,7 @@
 Notification service utilities.
 """
 from typing import Dict, Any, Optional
-from .models import Notification
+from apps.notifications.models import Notification
 
 
 def create_notification(
