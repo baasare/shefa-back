@@ -24,13 +24,19 @@ cors_origins = config('CORS_ALLOWED_ORIGINS', default='')
 CORS_ALLOWED_ORIGINS = [origin.strip() for origin in cors_origins.split(',') if origin.strip()]
 CORS_ALLOW_CREDENTIALS = True
 
-# Email settings (configure with production email service)
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# Email settings - Using Resend for ALL emails (including django-allauth)
+EMAIL_BACKEND = 'core.email_backends.ResendEmailBackend'
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@shefaai.com')
+
+# SMTP settings (kept as fallback, not used when Resend backend is active)
 EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
 EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
+
+# Resend configuration is loaded in base.py
+# All emails (django-allauth + app notifications) now use Resend
 
 # Sentry integration
 SENTRY_DSN = config('SENTRY_DSN', default='')

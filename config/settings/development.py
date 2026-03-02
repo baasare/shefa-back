@@ -23,7 +23,10 @@ INSTALLED_APPS += [
     'django_extensions',
 ]
 
-# Console email backend for development
+# Email backend for development
+# Use console backend for local development (prints to console)
+# To test Resend in development, comment out line below and use:
+# EMAIL_BACKEND = 'core.email_backends.ResendEmailBackend'
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 # Logging

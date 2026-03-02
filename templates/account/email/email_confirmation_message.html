@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+    <div style="background-color: #3b82f6; color: white; padding: 20px; border-radius: 5px 5px 0 0;">
+        <h1 style="margin: 0; font-size: 24px;">Welcome to ShefaAI! 🎉</h1>
+    </div>
+    <div style="background-color: #f9fafb; padding: 30px; border-radius: 0 0 5px 5px;">
+        <p style="font-size: 16px;">Hi {{ user.get_full_name|default:user.email }},</p>
+
+        <p style="font-size: 16px;">
+            Thank you for signing up for ShefaAI Trading Platform! To complete your registration,
+            please verify your email address by clicking the button below:
+        </p>
+
+        <div style="text-align: center; margin: 30px 0;">
+            <a href="{{ activate_url }}"
+               style="background-color: #3b82f6; color: white; padding: 12px 30px;
+                      text-decoration: none; border-radius: 5px; display: inline-block;
+                      font-weight: bold;">
+                Verify Email Address
+            </a>
+        </div>
+
+        <p style="font-size: 14px; color: #6b7280;">
+            If the button doesn't work, copy and paste this link into your browser:
+        </p>
+        <p style="font-size: 12px; color: #6b7280; word-break: break-all; background-color: #e5e7eb; padding: 10px; border-radius: 3px;">
+            {{ activate_url }}
+        </p>
+
+        <p style="font-size: 14px; color: #6b7280; margin-top: 30px;">
+            ⏰ This link will expire in {{ expiration_days }} day{{ expiration_days|pluralize }}.
+        </p>
+
+        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+
+        <p style="font-size: 12px; color: #6b7280; margin: 0;">
+            If you didn't create an account with ShefaAI, you can safely ignore this email.<br><br>
+            <strong>ShefaAI Trading Platform</strong><br>
+            AI-Powered Autonomous Trading
+        </p>
+    </div>
+</body>
+</html>

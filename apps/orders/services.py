@@ -576,6 +576,8 @@ def approve_order_with_audit(order: Order, user, request=None) -> tuple[bool, Op
     try:
         # Update to pending for submission
         order.status = 'pending'
+        order.approved_at = timezone.now()
+        order.approved_by = user
         order.save()
 
         # Log approval
@@ -589,6 +591,12 @@ def approve_order_with_audit(order: Order, user, request=None) -> tuple[bool, Op
         )
 
         logger.info(f"Order {order.id} approved by {user.email}")
+
+        # Trigger execution after approval
+        from apps.orders.tasks import execute_approved_order
+        execute_approved_order.delay(str(order.id))
+        logger.info(f"Order {order.id} queued for execution after approval")
+
         return True, None
 
     except Exception as e:

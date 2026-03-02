@@ -3,10 +3,10 @@ Notification tasks for email, SMS, and push notifications.
 """
 from celery import shared_task
 from django.conf import settings
-from django.core.mail import send_mail
 from celery.utils.log import get_task_logger
 
 from apps.notifications.models import Notification
+from apps.notifications.email_service import get_email_service
 
 logger = get_task_logger(__name__)
 
@@ -14,30 +14,46 @@ logger = get_task_logger(__name__)
 @shared_task(bind=True, max_retries=3)
 def send_email_notification(self, notification_id: int):
     """
-    Send email notification.
+    Send email notification via Resend.
 
     Args:
         notification_id: Notification ID
     """
     try:
         notification = Notification.objects.get(id=notification_id)
+        email_service = get_email_service()
 
-        subject = notification.title
-        message = notification.message
-        from_email = settings.DEFAULT_FROM_EMAIL
-        recipient_list = [notification.user.email]
+        # Determine action URL based on notification type
+        action_url = None
+        action_text = None
 
-        send_mail(
-            subject=subject,
-            message=message,
-            from_email=from_email,
-            recipient_list=recipient_list,
-            fail_silently=False
+        if notification.type == 'approval_request' and notification.data:
+            order_id = notification.data.get('order_id')
+            if order_id:
+                frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+                action_url = f"{frontend_url}/orders/{order_id}/approve"
+                action_text = "Review Order"
+        elif notification.type == 'trade_execution' and notification.data:
+            frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+            action_url = f"{frontend_url}/portfolio"
+            action_text = "View Portfolio"
+
+        # Send email using Resend
+        result = email_service.send_notification_email(
+            to_email=notification.user.email,
+            title=notification.title,
+            message=notification.message,
+            notification_type=notification.type,
+            action_url=action_url,
+            action_text=action_text
         )
 
-        logger.info(f"Sent email notification {notification_id} to {notification.user.email}")
-
-        return {'success': True, 'notification_id': notification_id}
+        if result['success']:
+            logger.info(f"Sent email notification {notification_id} to {notification.user.email} via Resend (ID: {result.get('id')})")
+            return {'success': True, 'notification_id': notification_id, 'email_id': result.get('id')}
+        else:
+            logger.error(f"Failed to send email notification {notification_id}: {result.get('error')}")
+            raise Exception(result.get('error', 'Unknown error'))
 
     except Notification.DoesNotExist:
         logger.error(f"Notification {notification_id} not found")

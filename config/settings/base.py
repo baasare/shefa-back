@@ -166,6 +166,7 @@ ACCOUNT_USERNAME_REQUIRED = False
 ACCOUNT_EMAIL_VERIFICATION = 'mandatory'
 ACCOUNT_EMAIL_CONFIRMATION_EXPIRE_DAYS = 1
 ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
+ACCOUNT_ADAPTER = 'core.allauth_adapter.CustomAccountAdapter'
 
 # Social Account Configuration
 SOCIALACCOUNT_EMAIL_AUTHENTICATION = True
@@ -187,6 +188,11 @@ SOCIALACCOUNT_PROVIDERS = {
 }
 
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+# Resend Email Configuration
+RESEND_API_KEY = config('RESEND_API_KEY', default='')
+RESEND_FROM_EMAIL = config('RESEND_FROM_EMAIL', default='noreply@shefafx.com')
+RESEND_FROM_NAME = config('RESEND_FROM_NAME', default='ShefaAI Trading')
 
 # Spectacular API Documentation
 SPECTACULAR_SETTINGS = {

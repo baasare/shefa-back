@@ -449,3 +449,164 @@ def sync_positions_from_broker(self, user_id: int, portfolio_id: int):
     except Exception as e:
         logger.error(f"Error syncing positions: {e}")
         return {'success': False, 'error': str(e)}
+
+
+@shared_task(bind=True, max_retries=3)
+def execute_approved_order(self, order_id: str):
+    """
+    Execute order after HITL approval.
+
+    Called automatically when a user approves a pending order.
+    This completes the HITL workflow by submitting the approved order to the broker.
+
+    Args:
+        order_id: Order UUID (as string)
+
+    Returns:
+        Dictionary with execution results
+
+    Usage:
+        Triggered automatically by approve_order_with_audit() in services.py
+    """
+    try:
+        order = Order.objects.select_related('portfolio__user').get(id=order_id)
+
+        # Verify order is in correct state
+        if order.status != 'pending':
+            logger.error(f"Order {order_id} not in pending state: {order.status}")
+            log_order_activity(
+                order,
+                'order_execution_failed',
+                success=False,
+                error_message=f"Invalid order state: {order.status}",
+                automated=True,
+                task_id=self.request.id
+            )
+            return {
+                'success': False,
+                'error': f'Invalid order state: {order.status}',
+                'order_id': order_id
+            }
+
+        # Verify order was approved
+        if not order.approved_at or not order.approved_by:
+            logger.warning(f"Order {order_id} in pending state but missing approval metadata")
+
+        # Get user's broker connection
+        broker_connection = BrokerConnection.objects.filter(
+            user=order.portfolio.user,
+            is_active=True
+        ).first()
+
+        if not broker_connection:
+            error_msg = f"No active broker connection for user {order.portfolio.user.id}"
+            logger.error(error_msg)
+
+            # Update order status to failed
+            order.status = 'failed'
+            order.error_message = error_msg
+            order.save()
+
+            log_order_activity(
+                order,
+                'order_execution_failed',
+                success=False,
+                error_message=error_msg,
+                automated=True,
+                task_id=self.request.id
+            )
+
+            return {
+                'success': False,
+                'error': error_msg,
+                'order_id': order_id
+            }
+
+        # Execute order using execution engine
+        engine = OrderExecutionEngine(order.portfolio.user, broker_connection)
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            # Execute the order (this submits to broker)
+            result = loop.run_until_complete(engine.execute_order(order))
+
+            logger.info(
+                f"Successfully executed approved order {order_id} "
+                f"(approved by {order.approved_by.email if order.approved_by else 'unknown'})"
+            )
+
+            # Log successful execution
+            log_order_activity(
+                order,
+                'order_executed_post_approval',
+                success=True,
+                automated=True,
+                task_id=self.request.id,
+                approved_by=order.approved_by.email if order.approved_by else None
+            )
+
+            return {
+                'success': True,
+                'order_id': order_id,
+                'broker_order_id': order.broker_order_id,
+                'status': order.status,
+                'result': result
+            }
+
+        finally:
+            loop.close()
+
+    except Order.DoesNotExist:
+        logger.error(f"Order {order_id} not found for execution")
+        sentry_sdk.capture_message(f"Order {order_id} not found for post-approval execution", level="error")
+        return {
+            'success': False,
+            'error': 'Order not found',
+            'order_id': order_id
+        }
+
+    except OrderExecutionError as e:
+        logger.error(f"Error executing approved order {order_id}: {e}")
+
+        # Update order and log failure
+        try:
+            order = Order.objects.get(id=order_id)
+            order.status = 'failed'
+            order.error_message = str(e)
+            order.save()
+
+            capture_order_context(order)
+            sentry_sdk.capture_exception(e)
+
+            log_order_activity(
+                order,
+                'order_execution_failed',
+                success=False,
+                error_message=str(e),
+                automated=True,
+                task_id=self.request.id
+            )
+        except:
+            pass
+
+        return {
+            'success': False,
+            'error': str(e),
+            'order_id': order_id
+        }
+
+    except Exception as e:
+        # Capture context if possible
+        try:
+            order = Order.objects.get(id=order_id)
+            capture_order_context(order)
+            sentry_sdk.capture_exception(e)
+        except:
+            pass
+
+        logger.error(f"Unexpected error executing approved order {order_id}: {e}")
+        sentry_sdk.capture_exception(e)
+
+        # Retry the task
+        raise self.retry(exc=e, countdown=60)
