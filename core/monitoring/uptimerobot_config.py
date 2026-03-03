@@ -129,25 +129,25 @@ def setup_monitors(base_url, api_key=None):
 
     monitors = [
         {
-            'name': 'ShefaAI - Homepage',
+            'name': 'ShefaFx - Homepage',
             'url': base_url,
             'type': 'http',
             'interval': 300,  # 5 minutes
         },
         {
-            'name': 'ShefaAI - API Health',
+            'name': 'ShefaFx - API Health',
             'url': f'{base_url}/api/health/',
             'type': 'http',
             'interval': 300,
         },
         {
-            'name': 'ShefaAI - Admin Panel',
+            'name': 'ShefaFx - Admin Panel',
             'url': f'{base_url}/admin/',
             'type': 'http',
             'interval': 600,  # 10 minutes
         },
         {
-            'name': 'ShefaAI - Market Data API',
+            'name': 'ShefaFx - Market Data API',
             'url': f'{base_url}/api/market-data/quotes/',
             'type': 'http',
             'interval': 300,

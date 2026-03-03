@@ -574,3 +574,128 @@ def update_strategy_performance(strategy: Strategy, trade_pnl: Decimal, is_winni
     strategy.save()
 
     logger.info(f"Updated strategy {strategy.id} performance: {strategy.total_trades} trades, {strategy.win_rate}% win rate")
+
+
+def evaluate_entry_conditions(conditions: List[Dict[str, Any]], market_data: Dict[str, Any]) -> bool:
+    """
+    Evaluate entry conditions against market data.
+
+    Args:
+        conditions: List of condition dictionaries
+        market_data: Dictionary with market indicators
+
+    Returns:
+        True if conditions are met
+    """
+    if not conditions:
+        return False
+
+    conditions_met = 0
+
+    for condition in conditions:
+        indicator = condition.get('indicator')
+        operator = condition.get('operator')
+        value = condition.get('value')
+
+        if indicator not in market_data:
+            continue
+
+        market_value = market_data[indicator]
+
+        if operator == 'gt' and market_value > value:
+            conditions_met += 1
+        elif operator == 'lt' and market_value < value:
+            conditions_met += 1
+        elif operator == 'eq' and market_value == value:
+            conditions_met += 1
+        elif operator == 'gte' and market_value >= value:
+            conditions_met += 1
+        elif operator == 'lte' and market_value <= value:
+            conditions_met += 1
+
+    # All conditions must be met
+    return conditions_met == len(conditions)
+
+
+def evaluate_exit_conditions(conditions: List[Dict[str, Any]], market_data: Dict[str, Any]) -> bool:
+    """
+    Evaluate exit conditions against market data.
+
+    Args:
+        conditions: List of condition dictionaries
+        market_data: Dictionary with market indicators
+
+    Returns:
+        True if exit conditions are met
+    """
+    if not conditions:
+        return False
+
+    conditions_met = 0
+
+    for condition in conditions:
+        indicator = condition.get('indicator')
+        operator = condition.get('operator')
+        value = condition.get('value')
+
+        if indicator not in market_data:
+            continue
+
+        market_value = market_data[indicator]
+
+        if operator == 'gt' and market_value > value:
+            conditions_met += 1
+        elif operator == 'lt' and market_value < value:
+            conditions_met += 1
+        elif operator == 'eq' and market_value == value:
+            conditions_met += 1
+        elif operator == 'gte' and market_value >= value:
+            conditions_met += 1
+        elif operator == 'lte' and market_value <= value:
+            conditions_met += 1
+
+    # Any exit condition met triggers exit
+    return conditions_met > 0
+
+
+def generate_signals(
+    strategy_config: Dict[str, Any],
+    market_data: Dict[str, Any],
+    has_position: bool = False
+) -> Dict[str, Any]:
+    """
+    Generate trading signals based on strategy config and market data.
+
+    Args:
+        strategy_config: Strategy configuration dictionary
+        market_data: Dictionary with market indicators
+        has_position: Whether there's an existing position
+
+    Returns:
+        Dictionary with signal information
+    """
+    signal = {
+        'action': 'hold',
+        'confidence': 0.0,
+        'reasons': []
+    }
+
+    # Check exit conditions first if we have a position
+    if has_position:
+        exit_conditions = strategy_config.get('exit_conditions', [])
+        if evaluate_exit_conditions(exit_conditions, market_data):
+            signal['action'] = 'sell'
+            signal['confidence'] = 0.8
+            signal['reasons'].append('Exit conditions met')
+            return signal
+
+    # Check entry conditions if we don't have a position
+    if not has_position:
+        entry_conditions = strategy_config.get('entry_conditions', [])
+        if evaluate_entry_conditions(entry_conditions, market_data):
+            signal['action'] = 'buy'
+            signal['confidence'] = 0.7
+            signal['reasons'].append('Entry conditions met')
+            return signal
+
+    return signal

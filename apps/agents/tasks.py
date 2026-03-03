@@ -11,8 +11,8 @@ from apps.agents.orchestrator import AgentOrchestrator
 from apps.portfolios.models import Portfolio
 from apps.strategies.models import Strategy
 from apps.orders.models import Order
-from apps.orders.execution import OrderExecutor
-from apps.notifications.tasks import send_strategy_signal_notification, send_approval_request
+from apps.orders.execution import OrderExecutionEngine
+from apps.notifications.tasks import send_strategy_signal_alert, send_approval_request
 
 
 @shared_task(bind=True, max_retries=3)
@@ -109,13 +109,10 @@ def run_watchlist_monitoring(self, strategy_id: str):
                     final_content = rec["final_recommendation"]["messages"][-1].content
 
                     # Send notification about the signal
-                    send_strategy_signal_notification.delay(
-                        strategy.user.id,
-                        {
-                            'symbol': rec["symbol"],
-                            'strategy_name': strategy.name,
-                            'recommendation': final_content[:200]  # First 200 chars
-                        }
+                    send_strategy_signal_alert.delay(
+                        str(strategy.id),
+                        rec["symbol"],
+                        final_content[:200]  # First 200 chars
                     )
 
                     signals.append({
@@ -264,12 +261,66 @@ def execute_autonomous_trade(self, strategy_id: str, symbol: str):
                 "approval_required": True
             }
 
-        # Execute order
-        executor = OrderExecutor()
+        # Execute order using execution engine
+        from apps.brokers.models import BrokerConnection
+
+        broker_connection = BrokerConnection.objects.filter(
+            user=strategy.user,
+            is_active=True
+        ).first()
+
+        if not broker_connection:
+            order.status = 'failed'
+            order.error_message = 'No active broker connection'
+            order.save()
+            return {
+                "success": False,
+                "error": "No active broker connection found",
+                "action": action,
+                "symbol": symbol,
+                "order_id": str(order.id)
+            }
+
+        engine = OrderExecutionEngine(strategy.user, broker_connection)
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
-            execution_result = loop.run_until_complete(executor.execute_order(order.id))
+            # Re-submit order using engine's submit_order since order was already created
+            # Update status to pending for submission
+            order.status = 'pending'
+            order.save()
+
+            executed_order = loop.run_until_complete(
+                engine.submit_order(
+                    portfolio=strategy.portfolio,
+                    symbol=order.symbol,
+                    quantity=order.quantity,
+                    side=order.side,
+                    order_type=order.order_type or 'market',
+                    limit_price=order.limit_price,
+                    stop_price=order.stop_price,
+                    time_in_force=order.time_in_force or 'day',
+                    strategy_id=strategy.id
+                )
+            )
+
+            # Delete the placeholder order and use the new one
+            order.delete()
+            order = executed_order
+
+            execution_result = {
+                "success": True,
+                "order_id": str(order.id),
+                "status": order.status
+            }
+        except Exception as e:
+            execution_result = {
+                "success": False,
+                "error": str(e)
+            }
+            order.status = 'failed'
+            order.error_message = str(e)
+            order.save()
         finally:
             loop.close()
 

@@ -13,9 +13,10 @@ from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 import logging
 
-from apps.agents.models import AgentRun, AgentDecision, AgentLog
+from apps.agents.models import AgentRun, AgentDecision, AgentLog, Agent
 from apps.agents.serializers import (
-    AgentRunSerializer, AgentDecisionSerializer, AgentLogSerializer
+    AgentRunSerializer, AgentDecisionSerializer, AgentLogSerializer,
+    AgentSerializer, AgentCreateSerializer, AgentUpdateSerializer
 )
 from apps.portfolios.models import Portfolio
 from apps.strategies.models import Strategy
@@ -431,3 +432,194 @@ class StrategyAgentViewSet(viewsets.ViewSet):
             'watchlist_size': len(strategy.watchlist) if strategy.watchlist else 0,
             'recent_signals': recent_signals
         })
+
+
+class AgentViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for user-created custom AI agents.
+
+    Provides full CRUD operations for managing custom agents,
+    including activation, deactivation, and running agent analysis.
+    """
+    permission_classes = [IsAuthenticated]
+    serializer_class = AgentSerializer
+
+    def get_queryset(self):
+        """Return only agents belonging to the current user."""
+        return Agent.objects.filter(user=self.request.user).select_related('strategy')
+
+    def get_serializer_class(self):
+        """Return appropriate serializer based on action."""
+        if self.action == 'create':
+            return AgentCreateSerializer
+        elif self.action in ['update', 'partial_update']:
+            return AgentUpdateSerializer
+        return AgentSerializer
+
+    @action(detail=True, methods=['post'])
+    def activate(self, request, pk=None):
+        """
+        Activate an agent to start automated analysis.
+
+        POST /api/agents/agents/{id}/activate/
+
+        Returns:
+        {
+            "success": true,
+            "message": "Agent activated successfully",
+            "agent_id": "uuid"
+        }
+        """
+        agent = self.get_object()
+        agent.activate()
+
+        logger.info(f"Activated agent {agent.id} ({agent.name}) for user {request.user.email}")
+
+        return Response({
+            'success': True,
+            'message': 'Agent activated successfully',
+            'agent_id': str(agent.id),
+            'agent_name': agent.name,
+            'is_active': agent.is_active
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'])
+    def deactivate(self, request, pk=None):
+        """
+        Deactivate an agent to stop automated analysis.
+
+        POST /api/agents/agents/{id}/deactivate/
+
+        Returns:
+        {
+            "success": true,
+            "message": "Agent deactivated successfully",
+            "agent_id": "uuid"
+        }
+        """
+        agent = self.get_object()
+        agent.deactivate()
+
+        logger.info(f"Deactivated agent {agent.id} ({agent.name}) for user {request.user.email}")
+
+        return Response({
+            'success': True,
+            'message': 'Agent deactivated successfully',
+            'agent_id': str(agent.id),
+            'agent_name': agent.name,
+            'is_active': agent.is_active
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'])
+    def run(self, request, pk=None):
+        """
+        Manually trigger an agent run.
+
+        POST /api/agents/agents/{id}/run/
+
+        Request body (optional):
+        {
+            "symbols": ["AAPL", "GOOGL"]  // Optional: override symbols
+        }
+
+        Returns:
+        {
+            "success": true,
+            "task_id": "celery-task-id",
+            "message": "Agent run started"
+        }
+        """
+        agent = self.get_object()
+
+        if not agent.is_active:
+            return Response({
+                'success': False,
+                'error': 'Agent is not active. Activate it first.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Get symbols from request or use strategy watchlist
+        symbols = request.data.get('symbols')
+        if not symbols and agent.strategy:
+            symbols = agent.strategy.watchlist
+
+        if not symbols:
+            return Response({
+                'success': False,
+                'error': 'No symbols provided. Either provide symbols or link agent to a strategy with watchlist.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Queue agent run task (reuse existing monitoring task)
+        if agent.strategy:
+            task = run_watchlist_monitoring.delay(str(agent.strategy.id))
+        else:
+            # For non-strategy agents, use analyze stock for first symbol
+            task = run_agent_analysis.delay(str(agent.user.id), symbols[0])
+
+        # Record the run
+        agent.record_run(success=True)
+
+        logger.info(f"Started manual run for agent {agent.id} ({agent.name})")
+
+        return Response({
+            'success': True,
+            'task_id': task.id,
+            'agent_id': str(agent.id),
+            'agent_name': agent.name,
+            'symbols': symbols if isinstance(symbols, list) else [symbols],
+            'message': 'Agent run started successfully'
+        }, status=status.HTTP_202_ACCEPTED)
+
+    @action(detail=True, methods=['get'])
+    def statistics(self, request, pk=None):
+        """
+        Get detailed statistics for an agent.
+
+        GET /api/agents/agents/{id}/statistics/
+
+        Returns:
+        {
+            "agent_id": "uuid",
+            "total_runs": 100,
+            "successful_runs": 85,
+            "failed_runs": 15,
+            "success_rate": 85.0,
+            "last_run": "2025-01-15T10:30:00Z",
+            "average_confidence": 0.75,
+            "decisions_breakdown": {
+                "buy": 30,
+                "sell": 25,
+                "hold": 45
+            }
+        }
+        """
+        agent = self.get_object()
+
+        # Get agent decisions if linked to strategy
+        decisions_breakdown = {'buy': 0, 'sell': 0, 'hold': 0}
+        average_confidence = 0.0
+
+        if agent.strategy:
+            from django.db.models import Avg, Count
+            decisions = AgentDecision.objects.filter(strategy=agent.strategy)
+            breakdown = decisions.values('decision').annotate(count=Count('decision'))
+
+            for item in breakdown:
+                decisions_breakdown[item['decision']] = item['count']
+
+            avg_conf = decisions.aggregate(avg=Avg('confidence'))
+            average_confidence = float(avg_conf['avg']) if avg_conf['avg'] else 0.0
+
+        return Response({
+            'agent_id': str(agent.id),
+            'agent_name': agent.name,
+            'total_runs': agent.run_count,
+            'successful_runs': agent.success_count,
+            'failed_runs': agent.run_count - agent.success_count,
+            'success_rate': round((agent.success_count / agent.run_count * 100) if agent.run_count > 0 else 0.0, 2),
+            'last_run': agent.last_run_at.isoformat() if agent.last_run_at else None,
+            'average_confidence': round(average_confidence, 2),
+            'decisions_breakdown': decisions_breakdown,
+            'is_active': agent.is_active,
+            'model': agent.model,
+            'data_source': agent.data_source
+        }, status=status.HTTP_200_OK)

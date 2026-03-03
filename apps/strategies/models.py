@@ -1,5 +1,5 @@
 """
-Strategy models for ShefaAI Trading Platform.
+Strategy models for ShefaFx Trading Platform.
 """
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator

@@ -1,6 +1,6 @@
 Hi {{ user.get_full_name|default:user.email }},
 
-Thank you for signing up for ShefaAI Trading Platform!
+Thank you for signing up for ShefaFx Trading Platform!
 
 To complete your registration, please verify your email address by visiting this link:
 
@@ -8,8 +8,8 @@ To complete your registration, please verify your email address by visiting this
 
 This link will expire in {{ expiration_days }} day{{ expiration_days|pluralize }}.
 
-If you didn't create an account with ShefaAI, you can safely ignore this email.
+If you didn't create an account with ShefaFx, you can safely ignore this email.
 
 ---
-ShefaAI Trading Platform
+ShefaFx Trading Platform
 AI-Powered Autonomous Trading

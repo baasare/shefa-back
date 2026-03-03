@@ -1,5 +1,5 @@
 """
-User serializers for ShefaAI Trading Platform.
+User serializers for ShefaFx Trading Platform.
 """
 from rest_framework import serializers
 from apps.users.models import User, UserProfile

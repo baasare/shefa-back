@@ -1,5 +1,5 @@
 """
-Authentication URLs for ShefaAI Trading Platform.
+Authentication URLs for ShefaFx Trading Platform.
 """
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter

@@ -1,5 +1,5 @@
 """
-Base settings for ShefaAI Trading Platform.
+Base settings for ShefaFx Trading Platform.
 """
 from pathlib import Path
 from decouple import config
@@ -192,11 +192,11 @@ EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 # Resend Email Configuration
 RESEND_API_KEY = config('RESEND_API_KEY', default='')
 RESEND_FROM_EMAIL = config('RESEND_FROM_EMAIL', default='noreply@shefafx.com')
-RESEND_FROM_NAME = config('RESEND_FROM_NAME', default='ShefaAI Trading')
+RESEND_FROM_NAME = config('RESEND_FROM_NAME', default='ShefaFx Trading')
 
 # Spectacular API Documentation
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'ShefaAI Trading Platform API',
+    'TITLE': 'ShefaFx Trading Platform API',
     'DESCRIPTION': 'AI-powered autonomous trading agent platform',
     'VERSION': '1.0.0',
     'COMPONENT_SPLIT_REQUEST': True,

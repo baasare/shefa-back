@@ -1,5 +1,5 @@
 """
-Celery configuration for ShefaAI Trading Platform.
+Celery configuration for ShefaFx Trading Platform.
 """
 import os
 from celery import Celery

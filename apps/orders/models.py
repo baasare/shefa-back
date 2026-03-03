@@ -1,5 +1,5 @@
 """
-Order and Trade models for ShefaAI Trading Platform.
+Order and Trade models for ShefaFx Trading Platform.
 """
 from django.db import models
 from django.core.validators import MinValueValidator

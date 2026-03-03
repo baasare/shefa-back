@@ -22,6 +22,38 @@ class BrokerConnectionViewSet(viewsets.ModelViewSet):
             user=self.request.user
         ).select_related('portfolio')
     
+    @action(detail=False, methods=['get'], url_path='alpaca-auth-url')
+    def alpaca_auth_url(self, request):
+        """
+        Get Alpaca OAuth authorization URL.
+
+        Returns the OAuth URL that the frontend should redirect to
+        for Alpaca broker connection authorization.
+        """
+        from django.conf import settings
+        import urllib.parse
+
+        # Get Alpaca OAuth credentials from settings
+        client_id = getattr(settings, 'ALPACA_OAUTH_CLIENT_ID', settings.ALPACA_API_KEY)
+        redirect_uri = getattr(settings, 'ALPACA_OAUTH_REDIRECT_URI', f"{settings.FRONTEND_URL}/broker-callback")
+
+        # Build Alpaca OAuth URL
+        base_url = "https://app.alpaca.markets/oauth/authorize"
+        params = {
+            'response_type': 'code',
+            'client_id': client_id,
+            'redirect_uri': redirect_uri,
+            'scope': 'account:write trading',
+            'state': request.user.id  # Use user ID as state for security
+        }
+
+        auth_url = f"{base_url}?{urllib.parse.urlencode(params)}"
+
+        return Response({
+            'auth_url': auth_url,
+            'redirect_uri': redirect_uri,
+        }, status=status.HTTP_200_OK)
+
     @action(detail=True, methods=['post'])
     def test_connection(self, request, pk=None):
         """

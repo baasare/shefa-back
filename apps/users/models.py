@@ -1,5 +1,5 @@
 """
-User models for ShefaAI Trading Platform.
+User models for ShefaFx Trading Platform.
 """
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models

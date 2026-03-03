@@ -4,9 +4,10 @@ Orders admin configuration.
 from django.contrib import admin
 from django.utils.html import format_html
 from apps.orders.models import Order, Trade
+from core.admin_2fa import secure_admin_site
 
 
-@admin.register(Order)
+@admin.register(Order, site=secure_admin_site)
 class OrderAdmin(admin.ModelAdmin):
     list_display = ['symbol', 'side', 'order_type', 'quantity', 'status_badge',
                     'requires_approval', 'created_at']
@@ -45,7 +46,7 @@ class OrderAdmin(admin.ModelAdmin):
     status_badge.short_description = 'Status'
 
 
-@admin.register(Trade)
+@admin.register(Trade, site=secure_admin_site)
 class TradeAdmin(admin.ModelAdmin):
     list_display = ['symbol', 'side', 'trade_type', 'quantity', 'price',
                     'realized_pnl_display', 'executed_at']

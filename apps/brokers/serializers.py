@@ -1,5 +1,5 @@
 """
-Broker serializers for ShefaAI Trading Platform.
+Broker serializers for ShefaFx Trading Platform.
 """
 from rest_framework import serializers
 from apps.brokers.models import BrokerConnection

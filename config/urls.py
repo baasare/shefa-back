@@ -1,5 +1,5 @@
 """
-URL configuration for ShefaAI Trading Platform.
+URL configuration for ShefaFx Trading Platform.
 """
 from django.contrib import admin
 from django.urls import path, include
@@ -10,10 +10,11 @@ from drf_spectacular.views import (
     SpectacularSwaggerView,
     SpectacularRedocView,
 )
+from core.admin_2fa import secure_admin_site
 
 urlpatterns = [
     # Admin
-    path('admin/', admin.site.urls),
+    path('admin/', secure_admin_site.urls),
 
     # API Documentation
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),

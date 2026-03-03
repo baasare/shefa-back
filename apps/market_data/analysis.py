@@ -253,3 +253,89 @@ def analyze_symbol(bars: List[Dict[str, Any]]) -> Dict[str, Any]:
     """
     analyzer = ChartAnalyzer(bars)
     return analyzer.analyze()
+
+
+def detect_trend(prices: List[float]) -> str:
+    """
+    Detect trend direction from price data.
+
+    Args:
+        prices: List of closing prices
+
+    Returns:
+        Trend direction: 'bullish', 'bearish', or 'neutral'
+    """
+    if len(prices) < 50:
+        return 'neutral'
+
+    prices_array = np.array(prices)
+
+    # Use SMA crossover
+    sma_20 = np.convolve(prices_array, np.ones(20)/20, mode='valid')
+    sma_50 = np.convolve(prices_array, np.ones(50)/50, mode='valid')
+
+    if len(sma_20) == 0 or len(sma_50) == 0:
+        return 'neutral'
+
+    current_20 = sma_20[-1]
+    current_50 = sma_50[-1]
+    current_price = prices_array[-1]
+
+    if current_price > current_20 > current_50:
+        return 'bullish'
+    elif current_price < current_20 < current_50:
+        return 'bearish'
+    else:
+        return 'neutral'
+
+
+def detect_double_top(prices: List[float]) -> bool:
+    """
+    Detect double top pattern in price data.
+
+    Args:
+        prices: List of closing prices
+
+    Returns:
+        True if double top pattern detected
+    """
+    if len(prices) < 50:
+        return False
+
+    prices_array = np.array(prices)
+    recent_prices = prices_array[-50:]
+
+    max_idx = np.argmax(recent_prices)
+
+    # Look for another high nearby
+    for i in range(max(0, max_idx-20), min(len(recent_prices), max_idx+20)):
+        if i != max_idx and abs(recent_prices[i] - recent_prices[max_idx]) < recent_prices[max_idx] * 0.02:
+            return True
+
+    return False
+
+
+def detect_double_bottom(prices: List[float]) -> bool:
+    """
+    Detect double bottom pattern in price data.
+
+    Args:
+        prices: List of closing prices
+
+    Returns:
+        True if double bottom pattern detected
+    """
+    if len(prices) < 50:
+        return False
+
+    prices_array = np.array(prices)
+    recent_prices = prices_array[-50:]
+
+    min_idx = np.argmin(recent_prices)
+
+    # Look for another low nearby
+    for i in range(max(0, min_idx-20), min(len(recent_prices), min_idx+20)):
+        if i != min_idx and abs(recent_prices[i] - recent_prices[min_idx]) < recent_prices[min_idx] * 0.02:
+            return True
+
+    return False

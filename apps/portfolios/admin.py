@@ -4,9 +4,10 @@ Portfolio admin configuration.
 from django.contrib import admin
 from django.utils.html import format_html
 from apps.portfolios.models import Portfolio, Position, PortfolioSnapshot
+from core.admin_2fa import secure_admin_site
 
 
-@admin.register(Portfolio)
+@admin.register(Portfolio, site=secure_admin_site)
 class PortfolioAdmin(admin.ModelAdmin):
     list_display = ['name', 'user_email', 'portfolio_type', 'total_equity_display',
                     'total_pnl_display', 'win_rate', 'is_active', 'created_at']
@@ -42,7 +43,7 @@ class PortfolioAdmin(admin.ModelAdmin):
     total_pnl_display.short_description = 'Total P&L'
 
 
-@admin.register(Position)
+@admin.register(Position, site=secure_admin_site)
 class PositionAdmin(admin.ModelAdmin):
     list_display = ['symbol', 'portfolio_name', 'side', 'quantity', 'avg_entry_price',
                     'current_price', 'unrealized_pnl_display', 'opened_at']
@@ -65,7 +66,7 @@ class PositionAdmin(admin.ModelAdmin):
     unrealized_pnl_display.short_description = 'Unrealized P&L'
 
 
-@admin.register(PortfolioSnapshot)
+@admin.register(PortfolioSnapshot, site=secure_admin_site)
 class PortfolioSnapshotAdmin(admin.ModelAdmin):
     list_display = ['portfolio_name', 'snapshot_date', 'total_equity', 'daily_pnl', 'win_rate']
     list_filter = ['snapshot_date']

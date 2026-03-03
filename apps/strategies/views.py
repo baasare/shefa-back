@@ -1,5 +1,5 @@
 """
-Strategy views for ShefaAI Trading Platform.
+Strategy views for ShefaFx Trading Platform.
 """
 from django.utils import timezone
 from rest_framework import viewsets, status

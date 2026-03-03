@@ -1,5 +1,5 @@
 """
-Portfolio views for ShefaAI Trading Platform.
+Portfolio views for ShefaFx Trading Platform.
 """
 from rest_framework import viewsets, status
 from rest_framework.decorators import action

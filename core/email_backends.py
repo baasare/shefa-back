@@ -39,7 +39,7 @@ class ResendEmailBackend(BaseEmailBackend):
         # Get Resend configuration from settings
         self.api_key = getattr(settings, 'RESEND_API_KEY', None)
         self.from_email = getattr(settings, 'RESEND_FROM_EMAIL', 'noreply@shefaai.com')
-        self.from_name = getattr(settings, 'RESEND_FROM_NAME', 'ShefaAI Trading')
+        self.from_name = getattr(settings, 'RESEND_FROM_NAME', 'ShefaFx Trading')
 
         if not self.api_key:
             if not fail_silently:

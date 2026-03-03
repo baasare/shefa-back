@@ -1,5 +1,5 @@
 """
-Notification models for ShefaAI Trading Platform.
+Notification models for ShefaFx Trading Platform.
 """
 from django.db import models
 import uuid

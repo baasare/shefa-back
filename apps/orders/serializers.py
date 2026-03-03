@@ -1,5 +1,5 @@
 """
-Order serializers for ShefaAI Trading Platform.
+Order serializers for ShefaFx Trading Platform.
 """
 from rest_framework import serializers
 from .models import Order, Trade

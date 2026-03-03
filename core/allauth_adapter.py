@@ -22,7 +22,7 @@ class CustomAccountAdapter(DefaultAccountAdapter):
             Formatted from email with name
         """
         from_email = getattr(settings, 'RESEND_FROM_EMAIL', 'noreply@shefaai.com')
-        from_name = getattr(settings, 'RESEND_FROM_NAME', 'ShefaAI Trading')
+        from_name = getattr(settings, 'RESEND_FROM_NAME', 'ShefaFx Trading')
         return f"{from_name} <{from_email}>"
 
     def send_mail(self, template_prefix, email, context):
@@ -35,7 +35,7 @@ class CustomAccountAdapter(DefaultAccountAdapter):
             context: Template context dictionary
         """
         # Add custom context variables
-        context['site_name'] = 'ShefaAI Trading Platform'
+        context['site_name'] = 'ShefaFx Trading Platform'
         context['site_url'] = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
         context['support_email'] = 'support@shefaai.com'
 

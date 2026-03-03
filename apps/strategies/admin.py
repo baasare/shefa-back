@@ -14,9 +14,10 @@ from apps.strategies.tasks import (
     cleanup_old_backtests
 )
 from apps.strategies.services import calculate_strategy_performance
+from core.admin_2fa import secure_admin_site
 
 
-@admin.register(Strategy)
+@admin.register(Strategy, site=secure_admin_site)
 class StrategyAdmin(admin.ModelAdmin):
     list_display = ['name', 'user_email', 'strategy_type', 'status_badge',
                     'win_rate', 'total_pnl_display', 'created_at']
@@ -198,7 +199,7 @@ class StrategyAdmin(admin.ModelAdmin):
     calculate_current_performance.short_description = "💹 Calculate & update performance now"
 
 
-@admin.register(Backtest)
+@admin.register(Backtest, site=secure_admin_site)
 class BacktestAdmin(admin.ModelAdmin):
     list_display = ['strategy_name', 'start_date', 'end_date', 'status_badge',
                     'total_return', 'sharpe_ratio', 'win_rate', 'created_at']

@@ -18,11 +18,12 @@ from apps.market_data.tasks import (
 )
 from apps.market_data.cache import MarketDataCache
 from apps.market_data.provider_manager import get_provider_manager
+from core.admin_2fa import secure_admin_site
 
 logger = logging.getLogger(__name__)
 
 
-@admin.register(Quote)
+@admin.register(Quote, site=secure_admin_site)
 class QuoteAdmin(admin.ModelAdmin):
     """Admin interface for Quote model with manual sync actions."""
 
@@ -225,7 +226,7 @@ class QuoteAdmin(admin.ModelAdmin):
         })
 
 
-@admin.register(Indicator)
+@admin.register(Indicator, site=secure_admin_site)
 class IndicatorAdmin(admin.ModelAdmin):
     """Admin interface for Indicator model."""
 
@@ -257,6 +258,6 @@ class IndicatorAdmin(admin.ModelAdmin):
 # Custom admin site configuration
 class MarketDataAdminSite(admin.AdminSite):
     """Custom admin site with market data dashboard."""
-    site_header = "ShefaAI Market Data Admin"
+    site_header = "ShefaFx Market Data Admin"
     site_title = "Market Data Admin"
     index_title = "Market Data Management"

@@ -1,0 +1,36 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block title %}Disable Two-Factor Authentication{% endblock %}
+
+{% block content %}
+<div style="max-width: 600px; margin: 100px auto; padding: 20px;">
+    <h1>Disable Two-Factor Authentication</h1>
+
+    <div style="margin: 30px 0; padding: 20px; background: #ffebee; border-left: 3px solid #f44336;">
+        <strong>Warning:</strong> Disabling two-factor authentication will make your account less secure.
+        You will need to set it up again the next time you log in.
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div style="padding: 10px; margin: 10px 0; background: {% if message.tags == 'error' %}#ffebee{% else %}#e8f5e9{% endif %}; border-left: 3px solid {% if message.tags == 'error' %}#f44336{% else %}#4caf50{% endif %};">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <form method="post" style="margin-top: 30px;">
+        {% csrf_token %}
+        <p>Are you sure you want to disable two-factor authentication?</p>
+        <div style="margin-top: 20px;">
+            <button type="submit" name="confirm" value="yes" style="padding: 10px 20px; margin-right: 10px; cursor: pointer; background: #f44336; color: white; border: none; border-radius: 4px;">
+                Yes, Disable 2FA
+            </button>
+            <a href="{% url 'admin:index' %}" style="padding: 10px 20px; background: #e0e0e0; color: #333; text-decoration: none; border-radius: 4px; display: inline-block;">
+                Cancel
+            </a>
+        </div>
+    </form>
+</div>
+{% endblock %}

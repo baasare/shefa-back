@@ -29,7 +29,7 @@ class ResendEmailService:
             resend.api_key = self.api_key
 
         self.from_email = getattr(settings, 'RESEND_FROM_EMAIL', 'noreply@shefaai.com')
-        self.from_name = getattr(settings, 'RESEND_FROM_NAME', 'ShefaAI Trading')
+        self.from_name = getattr(settings, 'RESEND_FROM_NAME', 'ShefaFx Trading')
 
     def send_email(
         self,
@@ -290,7 +290,7 @@ class ResendEmailService:
                 {action_button}
                 <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
                 <p style="font-size: 12px; color: #6b7280; margin: 0;">
-                    This is an automated notification from ShefaAI Trading Platform.<br>
+                    This is an automated notification from ShefaFx Trading Platform.<br>
                     If you have questions, please contact support.
                 </p>
             </div>
@@ -339,7 +339,7 @@ class ResendEmailService:
 
                 <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
                 <p style="font-size: 12px; color: #6b7280; margin: 0;">
-                    ShefaAI Trading Platform<br>
+                    ShefaFx Trading Platform<br>
                     This is an automated notification.
                 </p>
             </div>
@@ -404,7 +404,7 @@ class ResendEmailService:
 
                 <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
                 <p style="font-size: 12px; color: #6b7280; margin: 0;">
-                    ShefaAI Trading Platform<br>
+                    ShefaFx Trading Platform<br>
                     This is an automated notification.
                 </p>
             </div>
@@ -465,7 +465,7 @@ class ResendEmailService:
 
                 <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
                 <p style="font-size: 12px; color: #6b7280; margin: 0;">
-                    ShefaAI Trading Platform<br>
+                    ShefaFx Trading Platform<br>
                     This is your daily automated summary.
                 </p>
             </div>

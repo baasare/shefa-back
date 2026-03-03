@@ -10,9 +10,10 @@ from apps.notifications.tasks import (
     send_daily_summary
 )
 from apps.notifications.services import mark_as_read
+from core.admin_2fa import secure_admin_site
 
 
-@admin.register(Notification)
+@admin.register(Notification, site=secure_admin_site)
 class NotificationAdmin(admin.ModelAdmin):
     list_display = [
         'title',

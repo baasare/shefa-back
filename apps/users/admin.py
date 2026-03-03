@@ -1,13 +1,14 @@
 """
-User admin configuration for ShefaAI Trading Platform.
+User admin configuration for ShefaFx Trading Platform.
 """
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.html import format_html
 from apps.users.models import User, UserProfile
+from core.admin_2fa import secure_admin_site
 
 
-@admin.register(User)
+@admin.register(User, site=secure_admin_site)
 class UserAdmin(BaseUserAdmin):
     """Enhanced User admin with custom fields."""
 
@@ -70,7 +71,7 @@ class UserAdmin(BaseUserAdmin):
     risk_tolerance_badge.short_description = 'Risk Tolerance'
 
 
-@admin.register(UserProfile)
+@admin.register(UserProfile, site=secure_admin_site)
 class UserProfileAdmin(admin.ModelAdmin):
     """User Profile admin."""
 

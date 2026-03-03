@@ -146,6 +146,142 @@ def _calculate_downside_deviation(returns: List[float]) -> float:
     return statistics.stdev(negative_returns) * 100 if len(negative_returns) > 1 else 0
 
 
+def calculate_max_drawdown(portfolio: Portfolio, days: int = 90) -> float:
+    """
+    Calculate maximum drawdown for portfolio.
+
+    Args:
+        portfolio: Portfolio instance
+        days: Period for calculation
+
+    Returns:
+        Maximum drawdown percentage
+    """
+    start_date = timezone.now() - timedelta(days=days)
+
+    snapshots = PortfolioSnapshot.objects.filter(
+        portfolio=portfolio,
+        timestamp__gte=start_date
+    ).order_by('timestamp')
+
+    if snapshots.count() < 2:
+        return 0.0
+
+    values = [float(s.total_value) for s in snapshots]
+
+    peak = values[0]
+    max_dd = 0.0
+
+    for value in values:
+        if value > peak:
+            peak = value
+        dd = ((peak - value) / peak) * 100 if peak > 0 else 0
+        if dd > max_dd:
+            max_dd = dd
+
+    return max_dd
+
+
+def calculate_sortino_ratio(portfolio: Portfolio, days: int = 30, risk_free_rate: float = 0.04) -> float:
+    """
+    Calculate Sortino ratio for portfolio (similar to Sharpe but only uses downside deviation).
+
+    Args:
+        portfolio: Portfolio instance
+        days: Period for calculation
+        risk_free_rate: Annual risk-free rate (default 4%)
+
+    Returns:
+        Sortino ratio or 0 if insufficient data
+    """
+    start_date = timezone.now() - timedelta(days=days)
+
+    snapshots = PortfolioSnapshot.objects.filter(
+        portfolio=portfolio,
+        timestamp__gte=start_date
+    ).order_by('timestamp')
+
+    if snapshots.count() < 2:
+        return 0.0
+
+    # Calculate daily returns
+    returns = []
+    snapshots_list = list(snapshots)
+
+    for i in range(1, len(snapshots_list)):
+        prev_value = float(snapshots_list[i-1].total_value)
+        curr_value = float(snapshots_list[i].total_value)
+
+        if prev_value > 0:
+            daily_return = (curr_value - prev_value) / prev_value
+            returns.append(daily_return)
+
+    if not returns:
+        return 0.0
+
+    # Calculate average return and downside deviation
+    avg_return = statistics.mean(returns)
+
+    # Only consider negative returns for downside deviation
+    negative_returns = [r for r in returns if r < 0]
+    if len(negative_returns) < 2:
+        return 0.0
+
+    downside_std = statistics.stdev(negative_returns)
+
+    if downside_std == 0:
+        return 0.0
+
+    # Annualize (assuming 252 trading days)
+    annual_return = avg_return * 252
+    annual_downside_std = downside_std * (252 ** 0.5)
+
+    # Calculate Sortino ratio
+    sortino = (annual_return - risk_free_rate) / annual_downside_std
+
+    return sortino
+
+
+def calculate_cagr(portfolio: Portfolio) -> float:
+    """
+    Calculate Compound Annual Growth Rate (CAGR) for portfolio.
+
+    Args:
+        portfolio: Portfolio instance
+
+    Returns:
+        CAGR as percentage
+    """
+    # Get first and last snapshots
+    snapshots = PortfolioSnapshot.objects.filter(
+        portfolio=portfolio
+    ).order_by('timestamp')
+
+    if snapshots.count() < 2:
+        return 0.0
+
+    first_snapshot = snapshots.first()
+    last_snapshot = snapshots.last()
+
+    start_value = float(first_snapshot.total_value)
+    end_value = float(last_snapshot.total_value)
+
+    if start_value <= 0:
+        return 0.0
+
+    # Calculate number of years
+    days = (last_snapshot.timestamp - first_snapshot.timestamp).days
+    years = days / 365.25
+
+    if years <= 0:
+        return 0.0
+
+    # Calculate CAGR
+    cagr = (((end_value / start_value) ** (1 / years)) - 1) * 100
+
+    return cagr
+
+
 def generate_trade_journal(portfolio: Portfolio, days: int = 30) -> List[Dict[str, Any]]:
     """
     Generate trade journal with all trades and notes.

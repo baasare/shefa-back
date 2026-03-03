@@ -1,5 +1,5 @@
 """
-Broker models for ShefaAI Trading Platform.
+Broker models for ShefaFx Trading Platform.
 """
 import uuid
 from django.db import models

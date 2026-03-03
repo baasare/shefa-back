@@ -1,5 +1,5 @@
 """
-Notification serializers for ShefaAI Trading Platform.
+Notification serializers for ShefaFx Trading Platform.
 """
 from rest_framework import serializers
 from apps.notifications.models import Notification

@@ -1,4 +1,4 @@
-# ShefaAI Trading Platform - Backend
+# ShefaFx Trading Platform - Backend
 
 AI-powered autonomous trading agent platform built with Django, Celery, and LangGraph.
 

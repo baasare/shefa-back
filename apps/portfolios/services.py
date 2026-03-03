@@ -428,6 +428,65 @@ def get_portfolio_history(
     ).order_by('timestamp')
 
 
+def calculate_portfolio_equity(portfolio: Portfolio) -> Decimal:
+    """
+    Calculate total portfolio equity (cash + positions value).
+    Synchronous version for use in tools.
+
+    Args:
+        portfolio: Portfolio instance
+
+    Returns:
+        Total equity value
+    """
+    import asyncio
+
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # If loop is already running, return simplified calculation
+            # This can happen in some contexts - just use cash as approximation
+            return portfolio.cash
+        else:
+            # Run async calculation
+            values = asyncio.run(calculate_portfolio_value(portfolio))
+            return values['total_value']
+    except Exception as e:
+        logger.error(f"Error calculating portfolio equity: {e}")
+        # Fallback to cash only
+        return portfolio.cash
+
+
+def calculate_position_pnl(position) -> Decimal:
+    """
+    Calculate P&L for a specific position.
+    Synchronous version for use in tools.
+
+    Args:
+        position: Position instance
+
+    Returns:
+        Unrealized P&L
+    """
+    import asyncio
+
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # Simplified calculation if loop is running
+            if position.current_price and position.quantity > 0:
+                market_value = position.current_price * position.quantity
+                return market_value - position.cost_basis
+            return Decimal('0')
+        else:
+            # Run async calculation
+            values = asyncio.run(calculate_position_value(position))
+            return values['unrealized_pnl']
+    except Exception as e:
+        logger.error(f"Error calculating position PnL: {e}")
+        return Decimal('0')
+
+
 def calculate_sharpe_ratio(portfolio: Portfolio, days: int = 30, risk_free_rate: Decimal = Decimal('0.04')) -> Optional[Decimal]:
     """
     Calculate Sharpe ratio for portfolio.

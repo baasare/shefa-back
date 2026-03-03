@@ -1,5 +1,5 @@
 """
-Authentication views for ShefaAI Trading Platform.
+Authentication views for ShefaFx Trading Platform.
 """
 from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
 from allauth.socialaccount.providers.oauth2.client import OAuth2Client

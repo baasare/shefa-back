@@ -1,5 +1,5 @@
 """
-Portfolio serializers for ShefaAI Trading Platform.
+Portfolio serializers for ShefaFx Trading Platform.
 """
 from rest_framework import serializers
 from apps.portfolios.models import Portfolio, Position, PortfolioSnapshot

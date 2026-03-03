@@ -711,3 +711,109 @@ def get_order_audit_history(order: Order) -> List[Dict[str, Any]]:
         }
         for log in audit_logs
     ]
+
+
+def calculate_position_size(
+    portfolio: Portfolio,
+    price: Decimal,
+    sizing_type: str = "percentage",
+    size_value: Decimal = Decimal('10.0')
+) -> int:
+    """
+    Calculate position size based on portfolio and sizing parameters.
+
+    Args:
+        portfolio: Portfolio instance
+        price: Current stock price
+        sizing_type: Type of position sizing ('fixed', 'percentage', 'shares')
+        size_value: Size value based on sizing_type
+
+    Returns:
+        Number of shares to purchase
+    """
+    if sizing_type == 'shares':
+        return int(size_value)
+
+    elif sizing_type == 'fixed':
+        # Fixed dollar amount
+        if price <= 0:
+            return 0
+        return int(size_value / price)
+
+    elif sizing_type == 'percentage':
+        # Percentage of portfolio equity
+        equity = portfolio.cash  # Simplified - could include position values
+        allocation = (size_value / Decimal('100')) * equity
+
+        if price <= 0:
+            return 0
+        return int(allocation / price)
+
+    return 0
+
+
+def validate_order(order: Order) -> tuple[bool, Optional[str]]:
+    """
+    Validate order parameters.
+
+    Args:
+        order: Order instance to validate
+
+    Returns:
+        Tuple of (is_valid, error_message)
+    """
+    # Check quantity
+    if order.quantity <= 0:
+        return False, "Quantity must be greater than 0"
+
+    # Check symbol
+    if not order.symbol or len(order.symbol) > 10:
+        return False, "Invalid symbol"
+
+    # Check side
+    if order.side not in ['buy', 'sell']:
+        return False, "Side must be 'buy' or 'sell'"
+
+    # Check type
+    if order.type not in ['market', 'limit', 'stop', 'stop_limit']:
+        return False, "Invalid order type"
+
+    # Check limit price for limit orders
+    if order.type in ['limit', 'stop_limit'] and not order.limit_price:
+        return False, "Limit price required for limit orders"
+
+    if order.limit_price and order.limit_price <= 0:
+        return False, "Limit price must be greater than 0"
+
+    # Check stop price for stop orders
+    if order.type in ['stop', 'stop_limit'] and not order.stop_price:
+        return False, "Stop price required for stop orders"
+
+    if order.stop_price and order.stop_price <= 0:
+        return False, "Stop price must be greater than 0"
+
+    return True, None
+
+
+def check_buying_power(portfolio: Portfolio, estimated_cost: Decimal) -> Dict[str, Any]:
+    """
+    Check if portfolio has sufficient buying power.
+
+    Args:
+        portfolio: Portfolio instance
+        estimated_cost: Estimated cost of the trade
+
+    Returns:
+        Dictionary with buying power check result
+    """
+    available_cash = portfolio.cash
+
+    has_buying_power = available_cash >= estimated_cost
+
+    return {
+        'has_buying_power': has_buying_power,
+        'available_cash': available_cash,
+        'required_cash': estimated_cost,
+        'shortfall': max(Decimal('0'), estimated_cost - available_cash),
+        'message': 'Sufficient buying power' if has_buying_power else f'Insufficient cash (need ${estimated_cost - available_cash})'
+    }

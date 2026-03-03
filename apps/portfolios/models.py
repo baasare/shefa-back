@@ -1,5 +1,5 @@
 """
-Portfolio models for ShefaAI Trading Platform.
+Portfolio models for ShefaFx Trading Platform.
 """
 import uuid
 from decimal import Decimal

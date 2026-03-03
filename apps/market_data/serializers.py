@@ -1,5 +1,5 @@
 """
-Market Data serializers for ShefaAI Trading Platform.
+Market Data serializers for ShefaFx Trading Platform.
 """
 from rest_framework import serializers
 from apps.market_data.models import Quote, Indicator

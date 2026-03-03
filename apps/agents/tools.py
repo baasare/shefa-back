@@ -8,7 +8,6 @@ from datetime import datetime, timedelta
 import asyncio
 
 from langchain.tools import tool
-from django.utils import timezone
 
 # Import existing services
 from apps.market_data.providers.massive import MassiveProvider
@@ -29,22 +28,18 @@ from apps.strategies.services import (
 )
 from apps.orders.services import (
     calculate_position_size,
-    validate_order,
     check_buying_power
 )
 from apps.portfolios.services import (
     calculate_portfolio_equity,
-    calculate_position_pnl
+    calculate_sharpe_ratio
 )
 from apps.portfolios.analytics import (
-    calculate_sharpe_ratio,
     calculate_max_drawdown,
     calculate_sortino_ratio,
     calculate_cagr
 )
-from apps.orders.models import Order
 from apps.portfolios.models import Portfolio, Position
-from apps.strategies.models import Strategy
 
 
 # ============================================================================
@@ -109,9 +104,9 @@ def get_historical_prices(symbol: str, days: int = 30) -> Dict[str, Any]:
 
 @tool
 def calculate_technical_indicators(
-    symbol: str,
-    indicators: List[str],
-    period: int = 14
+        symbol: str,
+        indicators: List[str],
+        period: int = 14
 ) -> Dict[str, Any]:
     """
     Calculate technical indicators for a stock.
@@ -168,9 +163,9 @@ def calculate_technical_indicators(
 
 @tool
 def get_market_news(
-    symbol: str,
-    limit: int = 10,
-    days_back: int = 7
+        symbol: str,
+        limit: int = 10,
+        days_back: int = 7
 ) -> Dict[str, Any]:
     """
     Get recent market news and sentiment for a stock.
@@ -267,10 +262,14 @@ def get_market_news(
                 "title": article.get('title'),
                 "summary": article.get('summary'),
                 "source": article.get('source'),
-                "published": article.get('time_published').isoformat() if isinstance(article.get('time_published'), datetime) else str(article.get('time_published')),
+                "published": article.get('time_published').isoformat() if isinstance(article.get('time_published'),
+                                                                                     datetime) else str(
+                    article.get('time_published')),
                 "url": article.get('url'),
-                "sentiment_score": ticker_sentiment.get('sentiment_score') if ticker_sentiment else article.get('overall_sentiment_score'),
-                "sentiment_label": ticker_sentiment.get('sentiment_label') if ticker_sentiment else article.get('overall_sentiment_label'),
+                "sentiment_score": ticker_sentiment.get('sentiment_score') if ticker_sentiment else article.get(
+                    'overall_sentiment_score'),
+                "sentiment_label": ticker_sentiment.get('sentiment_label') if ticker_sentiment else article.get(
+                    'overall_sentiment_label'),
                 "relevance_score": ticker_sentiment.get('relevance_score') if ticker_sentiment else 0
             })
 
@@ -348,9 +347,9 @@ def detect_chart_patterns(symbol: str, pattern_type: str = "all") -> Dict[str, A
 
 @tool
 def evaluate_trading_signal(
-    symbol: str,
-    strategy_config: Dict[str, Any],
-    current_position: Optional[Dict[str, Any]] = None
+        symbol: str,
+        strategy_config: Dict[str, Any],
+        current_position: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """
     Evaluate trading signals based on strategy configuration.
@@ -400,8 +399,8 @@ def evaluate_trading_signal(
 
 @tool
 def check_entry_conditions(
-    symbol: str,
-    conditions: List[Dict[str, Any]]
+        symbol: str,
+        conditions: List[Dict[str, Any]]
 ) -> Dict[str, Any]:
     """
     Check if entry conditions are met for a stock.
@@ -444,8 +443,8 @@ def check_entry_conditions(
 
 @tool
 def check_exit_conditions(
-    symbol: str,
-    conditions: List[Dict[str, Any]]
+        symbol: str,
+        conditions: List[Dict[str, Any]]
 ) -> Dict[str, Any]:
     """
     Check if exit conditions are met for a stock position.
@@ -625,11 +624,11 @@ def check_portfolio_buying_power(portfolio_id: str, estimated_cost: float) -> Di
 
 @tool
 def calculate_optimal_position_size(
-    portfolio_id: str,
-    symbol: str,
-    price: float,
-    sizing_type: Literal["fixed", "percentage", "shares"] = "percentage",
-    size_value: float = 10.0
+        portfolio_id: str,
+        symbol: str,
+        price: float,
+        sizing_type: Literal["fixed", "percentage", "shares"] = "percentage",
+        size_value: float = 10.0
 ) -> Dict[str, Any]:
     """
     Calculate optimal position size based on portfolio and risk parameters.
@@ -686,12 +685,12 @@ def calculate_optimal_position_size(
 
 @tool
 def create_order_recommendation(
-    portfolio_id: str,
-    symbol: str,
-    side: Literal["buy", "sell"],
-    quantity: int,
-    order_type: Literal["market", "limit"] = "market",
-    limit_price: Optional[float] = None
+        portfolio_id: str,
+        symbol: str,
+        side: Literal["buy", "sell"],
+        quantity: int,
+        order_type: Literal["market", "limit"] = "market",
+        limit_price: Optional[float] = None
 ) -> Dict[str, Any]:
     """
     Create an order recommendation (does not execute, only prepares).
@@ -783,10 +782,10 @@ def create_order_recommendation(
 
 @tool
 def calculate_risk_metrics(
-    portfolio_id: str,
-    symbol: str,
-    quantity: int,
-    entry_price: float
+        portfolio_id: str,
+        symbol: str,
+        quantity: int,
+        entry_price: float
 ) -> Dict[str, Any]:
     """
     Calculate risk metrics for a potential trade.
@@ -819,8 +818,8 @@ def calculate_risk_metrics(
 
         # Calculate volatility (simplified)
         if len(prices) > 1:
-            returns = [(prices[i] - prices[i-1]) / prices[i-1] for i in range(1, len(prices))]
-            volatility = (sum([r**2 for r in returns]) / len(returns)) ** 0.5
+            returns = [(prices[i] - prices[i - 1]) / prices[i - 1] for i in range(1, len(prices))]
+            volatility = (sum([r ** 2 for r in returns]) / len(returns)) ** 0.5
         else:
             volatility = 0
 

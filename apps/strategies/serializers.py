@@ -1,5 +1,5 @@
 """
-Strategy serializers for ShefaAI Trading Platform.
+Strategy serializers for ShefaFx Trading Platform.
 """
 from rest_framework import serializers
 from apps.strategies.models import Strategy, Backtest

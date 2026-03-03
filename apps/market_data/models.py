@@ -1,5 +1,5 @@
 """
-Market Data models for ShefaAI Trading Platform.
+Market Data models for ShefaFx Trading Platform.
 """
 import uuid
 from django.db import models

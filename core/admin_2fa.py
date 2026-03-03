@@ -54,8 +54,8 @@ class SecureAdminSite(admin.AdminSite):
     Custom admin site that enforces 2FA for superusers.
     """
 
-    site_title = 'ShefaAI Secure Admin'
-    site_header = 'ShefaAI Administration (2FA Protected)'
+    site_title = 'ShefaFx Secure Admin'
+    site_header = 'ShefaFx Administration'
     index_title = 'Dashboard'
 
     def get_urls(self):
@@ -103,6 +103,9 @@ class SecureAdminSite(admin.AdminSite):
             if device.verify_token(token):
                 device.confirmed = True
                 device.save()
+                # Mark user as verified for this session
+                from django_otp import login as otp_login
+                otp_login(request, device)
                 messages.success(request, "2FA has been successfully enabled!")
                 return redirect('admin:index')
             else:
