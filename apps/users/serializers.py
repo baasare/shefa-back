@@ -4,12 +4,15 @@ User serializers for ShefaFx Trading Platform.
 from rest_framework import serializers
 from apps.users.models import User, UserProfile
 from dj_rest_auth.registration.serializers import RegisterSerializer
-from dj_rest_auth.serializers import JWTSerializer
+from dj_rest_auth.serializers import JWTSerializer, PasswordResetSerializer, PasswordResetConfirmSerializer
 from allauth.account.adapter import get_adapter
 from django.db import transaction
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.exceptions import InvalidToken
 from django.contrib.auth import get_user_model
+from django.conf import settings
+from django.utils.encoding import force_str
+from uuid import UUID
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
@@ -151,3 +154,114 @@ class CustomTokenRefreshSerializer(TokenRefreshSerializer):
                 'detail': 'User associated with this token no longer exists. Please log in again.',
                 'code': 'user_not_found'
             })
+
+
+class CustomPasswordResetSerializer(PasswordResetSerializer):
+    """
+    Custom password reset serializer that uses frontend URLs.
+    """
+    def get_email_options(self):
+        """Override to use custom adapter which provides frontend URLs."""
+        return {
+            'email_template_name': 'account/email/password_reset_key_message.txt',
+            'html_email_template_name': 'account/email/password_reset_key_message.html',
+            'subject_template_name': 'account/email/password_reset_key_subject.txt',
+            'extra_email_context': {
+                'site_name': 'ShefaFx Trading Platform',
+                'frontend_url': settings.FRONTEND_URL,
+            }
+        }
+
+    def save(self):
+        """
+        Override save to use allauth adapter's password reset URL generation.
+        This ensures the reset link points to the frontend.
+        """
+        request = self.context.get('request')
+        opts = self.get_email_options()
+        from allauth.account.forms import default_token_generator
+        from django.utils.http import urlsafe_base64_encode
+        from django.utils.encoding import force_bytes
+
+        email = self.validated_data['email']
+        User = get_user_model()
+
+        # Get users with this email
+        users = User.objects.filter(email__iexact=email, is_active=True)
+
+        for user in users:
+            # Generate token
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+            token = default_token_generator.make_token(user)
+
+            # Get password reset URL from adapter
+            adapter = get_adapter()
+            url = adapter.get_password_reset_url(request, uid, token)
+
+            # Send email via adapter
+            context = {
+                'user': user,
+                'password_reset_url': url,
+                'request': request,
+                **opts.get('extra_email_context', {})
+            }
+
+            adapter.send_mail(
+                'account/email/password_reset_key',
+                email,
+                context
+            )
+
+
+class CustomPasswordResetConfirmSerializer(PasswordResetConfirmSerializer):
+    """
+    Custom password reset confirm serializer that properly handles base64-encoded UIDs.
+    Matches the encoding used in CustomPasswordResetSerializer.
+    """
+    # Override uid field to accept string instead of UUID
+    uid = serializers.CharField()
+
+    def validate(self, attrs):
+        """
+        Validate the token and decode the UID to get the user.
+        Uses base64 decoding to match the encoding in CustomPasswordResetSerializer.
+        Handles UUID primary keys by converting the decoded string to UUID.
+        """
+        from allauth.account.forms import default_token_generator
+        from django.utils.http import urlsafe_base64_decode
+
+        try:
+            # Decode the base64-encoded UID
+            uid_str = force_str(urlsafe_base64_decode(attrs['uid']))
+            # Convert to UUID if the model uses UUID primary keys
+            try:
+                uid = UUID(uid_str)
+            except ValueError:
+                # If not a valid UUID, use the string directly (for integer PKs)
+                uid = uid_str
+            self.user = User.objects.get(pk=uid)
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            raise serializers.ValidationError({'uid': ['Invalid value']})
+
+        # Validate the token
+        if not default_token_generator.check_token(self.user, attrs['token']):
+            raise serializers.ValidationError({'token': ['Invalid or expired token']})
+
+        # Set up the SetPasswordForm for password validation
+        from django.contrib.auth.forms import SetPasswordForm
+        self.set_password_form = SetPasswordForm(
+            user=self.user,
+            data={
+                'new_password1': attrs['new_password1'],
+                'new_password2': attrs['new_password2']
+            }
+        )
+
+        if not self.set_password_form.is_valid():
+            raise serializers.ValidationError(self.set_password_form.errors)
+
+        return attrs
+
+    def save(self):
+        """Save the new password."""
+        return self.set_password_form.save()
