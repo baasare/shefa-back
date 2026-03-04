@@ -24,7 +24,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
 class UserSerializer(serializers.ModelSerializer):
     """Serializer for User model."""
-    profile = UserProfileSerializer(read_only=True)
+    profile = UserProfileSerializer(read_only=False, required=False)
     full_name = serializers.CharField(source='get_full_name', read_only=True)
 
     class Meta:
@@ -38,6 +38,24 @@ class UserSerializer(serializers.ModelSerializer):
             'profile'
         ]
         read_only_fields = ['id', 'email', 'created_at', 'updated_at', 'is_verified']
+
+    def update(self, instance, validated_data):
+        """Update user and nested profile data."""
+        profile_data = validated_data.pop('profile', None)
+
+        # Update user fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        # Update profile if provided
+        if profile_data:
+            profile, created = UserProfile.objects.get_or_create(user=instance)
+            for attr, value in profile_data.items():
+                setattr(profile, attr, value)
+            profile.save()
+
+        return instance
 
 
 class CustomRegisterSerializer(RegisterSerializer):
