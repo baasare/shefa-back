@@ -55,7 +55,7 @@ class CustomAccountAdapter(DefaultAccountAdapter):
         """
         # Point to frontend URL instead of backend
         frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
-        return f"{frontend_url}/verify-email/{emailconfirmation.key}"
+        return f"{frontend_url}/confirm-email/{emailconfirmation.key}"
 
     def get_password_reset_url(self, request, uid, token):
         """

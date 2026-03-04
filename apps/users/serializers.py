@@ -4,8 +4,12 @@ User serializers for ShefaFx Trading Platform.
 from rest_framework import serializers
 from apps.users.models import User, UserProfile
 from dj_rest_auth.registration.serializers import RegisterSerializer
+from dj_rest_auth.serializers import JWTSerializer
 from allauth.account.adapter import get_adapter
 from django.db import transaction
+from rest_framework_simplejwt.serializers import TokenRefreshSerializer
+from rest_framework_simplejwt.exceptions import InvalidToken
+from django.contrib.auth import get_user_model
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
@@ -111,3 +115,17 @@ class UserCreateSerializer(serializers.ModelSerializer):
         # Create profile
         UserProfile.objects.create(user=user)
         return user
+
+
+class CustomTokenRefreshSerializer(TokenRefreshSerializer):
+    """
+    Custom token refresh serializer that handles deleted users gracefully.
+    """
+    def validate(self, attrs):
+        try:
+            return super().validate(attrs)
+        except get_user_model().DoesNotExist:
+            raise InvalidToken({
+                'detail': 'User associated with this token no longer exists. Please log in again.',
+                'code': 'user_not_found'
+            })

@@ -159,6 +159,7 @@ SIMPLE_JWT = {
     'BLACKLIST_AFTER_ROTATION': True,
     'ALGORITHM': 'HS256',
     'SIGNING_KEY': SECRET_KEY,
+    'TOKEN_REFRESH_SERIALIZER': 'apps.users.serializers.CustomTokenRefreshSerializer',
 }
 
 # Django Allauth Configuration
