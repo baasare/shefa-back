@@ -3,6 +3,9 @@ User serializers for ShefaFx Trading Platform.
 """
 from rest_framework import serializers
 from apps.users.models import User, UserProfile
+from dj_rest_auth.registration.serializers import RegisterSerializer
+from allauth.account.adapter import get_adapter
+from django.db import transaction
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
@@ -37,8 +40,41 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'email', 'created_at', 'updated_at', 'is_verified']
 
 
+class CustomRegisterSerializer(RegisterSerializer):
+    """
+    Custom registration serializer for dj-rest-auth.
+    Extends the default RegisterSerializer to include first_name and last_name.
+    """
+    first_name = serializers.CharField(required=False, max_length=150)
+    last_name = serializers.CharField(required=False, max_length=150)
+
+    def get_cleaned_data(self):
+        """
+        Override to include first_name and last_name in cleaned data.
+        """
+        data = super().get_cleaned_data()
+        data['first_name'] = self.validated_data.get('first_name', '')
+        data['last_name'] = self.validated_data.get('last_name', '')
+        return data
+
+    @transaction.atomic
+    def save(self, request):
+        """
+        Save user with first_name and last_name, and create UserProfile.
+        """
+        # Call parent save to handle allauth registration flow
+        # This will create EmailAddress and EmailConfirmation
+        user = super().save(request)
+
+        # Create UserProfile for the user if it doesn't exist
+        if not hasattr(user, 'profile'):
+            UserProfile.objects.create(user=user)
+
+        return user
+
+
 class UserCreateSerializer(serializers.ModelSerializer):
-    """Serializer for user registration."""
+    """Serializer for user registration (legacy/alternative)."""
     password = serializers.CharField(write_only=True, min_length=8)
     password_confirm = serializers.CharField(write_only=True)
 
