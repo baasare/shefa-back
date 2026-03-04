@@ -66,9 +66,31 @@ class CustomRegisterSerializer(RegisterSerializer):
     """
     Custom registration serializer for dj-rest-auth.
     Extends the default RegisterSerializer to include first_name and last_name.
+    Handles soft-deleted users trying to re-register.
     """
     first_name = serializers.CharField(required=False, max_length=150)
     last_name = serializers.CharField(required=False, max_length=150)
+
+    def validate_email(self, email):
+        """
+        Check if a soft-deleted user exists with this email.
+        If so, prevent registration and inform the user.
+        """
+        email = get_adapter().clean_email(email)
+
+        # Check for soft-deleted users with this email
+        deleted_user = User.all_objects.filter(
+            email=email,
+            is_deleted=True
+        ).first()
+
+        if deleted_user:
+            raise serializers.ValidationError(
+                "An account with this email was previously deleted. "
+                "Please contact support to restore your account or use a different email address."
+            )
+
+        return email
 
     def get_cleaned_data(self):
         """

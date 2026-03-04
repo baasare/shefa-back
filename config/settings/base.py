@@ -112,7 +112,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 AUTHENTICATION_BACKENDS = [
     'allauth.account.auth_backends.AuthenticationBackend',
-    'django.contrib.auth.backends.ModelBackend',
+    'apps.users.backends.SoftDeleteAwareBackend',
 ]
 
 LANGUAGE_CODE = 'en-us'
