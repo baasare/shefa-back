@@ -108,6 +108,7 @@ class User(AbstractUser):
     is_active = models.BooleanField('Active', default=True)
     is_verified = models.BooleanField('Email Verified', default=False)
     is_deleted = models.BooleanField('Deleted', default=False)
+    onboarding_completed = models.BooleanField('Onboarding Completed', default=False)
     deleted_at = models.DateTimeField('Deleted At', blank=True, null=True)
     created_at = models.DateTimeField('Date Joined', auto_now_add=True)
     updated_at = models.DateTimeField('Last Updated', auto_now=True)

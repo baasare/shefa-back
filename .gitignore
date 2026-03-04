@@ -60,3 +60,5 @@ htmlcov/
 # Migrations (optional - uncomment if you want to ignore)
 # */migrations/*
 # !*/migrations/__init__.py
+
+dump.rdb

@@ -14,10 +14,10 @@ class UserAdmin(BaseUserAdmin):
 
     list_display = [
         'email', 'display_name', 'risk_tolerance_badge', 'experience_level',
-        'is_verified', 'is_active', 'is_deleted_badge', 'created_at'
+        'is_verified', 'is_active', 'onboarding_completed', 'is_deleted_badge', 'created_at'
     ]
     list_filter = [
-        'is_deleted', 'is_active', 'is_verified', 'is_staff', 'risk_tolerance',
+        'is_deleted', 'is_active', 'is_verified', 'is_staff', 'onboarding_completed', 'risk_tolerance',
         'experience_level', 'mfa_enabled', 'created_at'
     ]
     search_fields = ['email', 'first_name', 'last_name']
@@ -31,7 +31,7 @@ class UserAdmin(BaseUserAdmin):
     fieldsets = (
         (None, {'fields': ('email', 'password')}),
         ('Personal Info', {
-            'fields': ('first_name', 'last_name', 'phone_number')
+            'fields': ('first_name', 'last_name', 'phone_number', 'onboarding_completed')
         }),
         ('Trading Preferences', {
             'fields': ('risk_tolerance', 'experience_level', 'approval_threshold')

@@ -28,18 +28,21 @@ class PortfolioAdmin(admin.ModelAdmin):
 
     def user_email(self, obj):
         return obj.user.email
+
     user_email.short_description = 'User'
 
     def total_equity_display(self, obj):
         return f'${obj.total_equity:,.2f}'
+
     total_equity_display.short_description = 'Total Equity'
 
     def total_pnl_display(self, obj):
         color = 'green' if obj.total_pnl >= 0 else 'red'
         return format_html(
-            '<span style="color: {};">${:,.2f} ({:.2f}%)</span>',
-            color, obj.total_pnl, obj.total_pnl_pct
+            '<span style="color: {};">{}</span>',
+            color, f'${obj.total_pnl:,.2f} ({obj.total_pnl_pct:.2f}%)'
         )
+
     total_pnl_display.short_description = 'Total P&L'
 
 
@@ -55,14 +58,16 @@ class PositionAdmin(admin.ModelAdmin):
 
     def portfolio_name(self, obj):
         return obj.portfolio.name
+
     portfolio_name.short_description = 'Portfolio'
 
     def unrealized_pnl_display(self, obj):
         color = 'green' if obj.unrealized_pnl >= 0 else 'red'
         return format_html(
-            '<span style="color: {};">${:,.2f} ({:.2f}%)</span>',
-            color, obj.unrealized_pnl, obj.unrealized_pnl_pct
+            '<span style="color: {};">{}</span>',
+            color, f'${obj.unrealized_pnl:,.2f} ({obj.unrealized_pnl_pct:.2f}%)'
         )
+
     unrealized_pnl_display.short_description = 'Unrealized P&L'
 
 
@@ -76,4 +81,5 @@ class PortfolioSnapshotAdmin(admin.ModelAdmin):
 
     def portfolio_name(self, obj):
         return obj.portfolio.name
+
     portfolio_name.short_description = 'Portfolio'

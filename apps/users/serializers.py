@@ -38,7 +38,7 @@ class UserSerializer(serializers.ModelSerializer):
             'phone_number', 'risk_tolerance', 'experience_level',
             'mfa_enabled', 'approval_threshold',
             'email_notifications', 'push_notifications', 'sms_notifications',
-            'is_active', 'is_verified', 'created_at', 'updated_at',
+            'is_active', 'is_verified', 'onboarding_completed', 'created_at', 'updated_at',
             'profile'
         ]
         read_only_fields = ['id', 'email', 'created_at', 'updated_at', 'is_verified']
