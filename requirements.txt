@@ -41,6 +41,7 @@ httpx==0.28.1
 python-dotenv==1.2.2
 pytz==2025.2
 django-json-widget==2.1.1
+user-agents==2.2.0
 
 # Email
 resend==2.23.0

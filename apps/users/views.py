@@ -11,6 +11,7 @@ from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from user_agents import parse
 
 
 
@@ -83,10 +84,25 @@ def active_sessions(request):
     for session in sessions:
         session_data = session.get_decoded()
         if session_data.get('_auth_user_id') == str(user.id):
+            # Extract device, browser, and location info
+            user_agent_string = session_data.get('user_agent', 'Unknown')
+            ip_address = session_data.get('ip_address', 'Unknown')
+
+            # Parse user agent
+            user_agent = parse(user_agent_string)
+
+            # Get location from IP (placeholder - you can integrate a GeoIP service)
+            location = session_data.get('location', 'Unknown')
+
             current_sessions.append({
                 'session_key': session.session_key[:10] + '...',  # Partial key for security
                 'expire_date': session.expire_date,
-                'is_current': session.session_key == request.session.session_key
+                'is_current': session.session_key == request.session.session_key,
+                'device': f"{user_agent.device.family}",
+                'browser': f"{user_agent.browser.family} {user_agent.browser.version_string}",
+                'os': f"{user_agent.os.family} {user_agent.os.version_string}",
+                'location': location,
+                'ip_address': ip_address
             })
 
     return Response({
