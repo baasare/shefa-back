@@ -2,7 +2,7 @@
 Strategy serializers for ShefaFx Trading Platform.
 """
 from rest_framework import serializers
-from apps.strategies.models import Strategy, Backtest
+from apps.strategies.models import Strategy, Backtest, StrategyTemplate, Watchlist
 
 
 class BacktestSerializer(serializers.ModelSerializer):
@@ -153,3 +153,112 @@ class StrategyListSerializer(serializers.ModelSerializer):
     
     def get_watchlist_count(self, obj):
         return len(obj.watchlist) if obj.watchlist else 0
+
+
+class StrategyTemplateSerializer(serializers.ModelSerializer):
+    """Serializer for Strategy Template model."""
+
+    class Meta:
+        model = StrategyTemplate
+        fields = [
+            'id', 'name', 'description', 'category', 'difficulty',
+            'strategy_type', 'config', 'entry_rules', 'exit_rules',
+            'default_position_size_pct', 'default_max_positions',
+            'default_max_daily_loss_pct', 'is_active', 'is_featured',
+            'usage_count', 'tags', 'expected_win_rate', 'expected_sharpe_ratio',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'usage_count', 'created_at', 'updated_at']
+
+
+class StrategyTemplateListSerializer(serializers.ModelSerializer):
+    """Lightweight serializer for template lists."""
+
+    class Meta:
+        model = StrategyTemplate
+        fields = [
+            'id', 'name', 'description', 'category', 'difficulty',
+            'is_featured', 'usage_count', 'expected_win_rate', 'tags'
+        ]
+
+
+class CreateStrategyFromTemplateSerializer(serializers.Serializer):
+    """Serializer for creating a strategy from a template."""
+
+    template_id = serializers.UUIDField()
+    name = serializers.CharField(max_length=255)
+    portfolio = serializers.UUIDField(required=False, allow_null=True)
+    watchlist = serializers.ListField(
+        child=serializers.CharField(max_length=10),
+        required=False,
+        allow_empty=True
+    )
+
+    # Optional overrides
+    position_size_pct = serializers.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        required=False
+    )
+    max_positions = serializers.IntegerField(required=False)
+    max_daily_loss_pct = serializers.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        required=False
+    )
+
+
+class WatchlistSerializer(serializers.ModelSerializer):
+    """Serializer for Watchlist model."""
+
+    user_email = serializers.EmailField(source='user.email', read_only=True)
+    symbol_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Watchlist
+        fields = [
+            'id', 'user', 'user_email', 'name', 'description',
+            'symbols', 'symbol_count', 'is_default', 'color',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'user', 'created_at', 'updated_at']
+
+    def get_symbol_count(self, obj):
+        """Get count of symbols in watchlist."""
+        return len(obj.symbols) if obj.symbols else 0
+
+    def validate_symbols(self, value):
+        """Validate symbols list."""
+        if not isinstance(value, list):
+            raise serializers.ValidationError("Symbols must be a list")
+
+        # Convert to uppercase and remove duplicates
+        value = list(set([str(symbol).upper().strip() for symbol in value]))
+
+        # Validate each symbol
+        for symbol in value:
+            if not symbol or len(symbol) > 10:
+                raise serializers.ValidationError(f"Invalid symbol: {symbol}")
+
+        return value
+
+    def create(self, validated_data):
+        """Create watchlist with user from request."""
+        validated_data['user'] = self.context['request'].user
+        return super().create(validated_data)
+
+
+class WatchlistListSerializer(serializers.ModelSerializer):
+    """Lightweight serializer for watchlist lists."""
+
+    symbol_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Watchlist
+        fields = [
+            'id', 'name', 'symbol_count', 'is_default',
+            'color', 'created_at'
+        ]
+
+    def get_symbol_count(self, obj):
+        return len(obj.symbols) if obj.symbols else 0

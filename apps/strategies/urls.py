@@ -8,6 +8,8 @@ from apps.strategies import views
 router = DefaultRouter()
 router.register(r'strategies', views.StrategyViewSet, basename='strategy')
 router.register(r'backtests', views.BacktestViewSet, basename='backtest')
+router.register(r'templates', views.StrategyTemplateViewSet, basename='template')
+router.register(r'watchlists', views.WatchlistViewSet, basename='watchlist')
 
 urlpatterns = [
     path('', include(router.urls)),

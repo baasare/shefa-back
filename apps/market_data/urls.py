@@ -8,6 +8,7 @@ from . import views
 router = DefaultRouter()
 router.register(r'quotes', views.QuoteViewSet, basename='quote')
 router.register(r'indicators', views.IndicatorViewSet, basename='indicator')
+router.register(r'screener', views.StockScreenerViewSet, basename='screener')
 
 urlpatterns = [
     path('', include(router.urls)),

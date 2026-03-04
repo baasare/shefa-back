@@ -149,3 +149,127 @@ class Backtest(models.Model):
 
     def __str__(self):
         return f'{self.strategy.name} Backtest ({self.start_date} to {self.end_date})'
+
+
+class StrategyTemplate(models.Model):
+    """Pre-built strategy templates that users can use to create strategies."""
+
+    CATEGORY_CHOICES = [
+        ('momentum', 'Momentum'),
+        ('mean_reversion', 'Mean Reversion'),
+        ('swing', 'Swing Trading'),
+        ('trend_following', 'Trend Following'),
+        ('breakout', 'Breakout'),
+        ('scalping', 'Scalping'),
+        ('position', 'Position Trading'),
+    ]
+
+    DIFFICULTY_CHOICES = [
+        ('beginner', 'Beginner'),
+        ('intermediate', 'Intermediate'),
+        ('advanced', 'Advanced'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    # Template Info
+    name = models.CharField('Template Name', max_length=255)
+    description = models.TextField('Description')
+    category = models.CharField('Category', max_length=50, choices=CATEGORY_CHOICES)
+    difficulty = models.CharField('Difficulty Level', max_length=20, choices=DIFFICULTY_CHOICES)
+
+    # Configuration
+    strategy_type = models.CharField('Strategy Type', max_length=50)
+    config = models.JSONField('Configuration Template', default=dict)
+    entry_rules = models.JSONField('Entry Rules Template', default=dict)
+    exit_rules = models.JSONField('Exit Rules Template', default=dict)
+
+    # Default Risk Parameters
+    default_position_size_pct = models.DecimalField(
+        'Default Position Size %',
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal('2.00')
+    )
+    default_max_positions = models.IntegerField('Default Max Positions', default=5)
+    default_max_daily_loss_pct = models.DecimalField(
+        'Default Max Daily Loss %',
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal('5.00')
+    )
+
+    # Template Metadata
+    is_active = models.BooleanField('Is Active', default=True)
+    is_featured = models.BooleanField('Is Featured', default=False)
+    usage_count = models.IntegerField('Usage Count', default=0)
+    tags = models.JSONField('Tags', default=list)
+
+    # Performance indicators (if backtested)
+    expected_win_rate = models.DecimalField(
+        'Expected Win Rate %',
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True
+    )
+    expected_sharpe_ratio = models.DecimalField(
+        'Expected Sharpe Ratio',
+        max_digits=10,
+        decimal_places=4,
+        null=True,
+        blank=True
+    )
+
+    created_at = models.DateTimeField('Created At', auto_now_add=True)
+    updated_at = models.DateTimeField('Updated At', auto_now=True)
+
+    class Meta:
+        db_table = 'strategy_templates'
+        verbose_name = 'Strategy Template'
+        verbose_name_plural = 'Strategy Templates'
+        ordering = ['-is_featured', '-usage_count', 'name']
+        indexes = [
+            models.Index(fields=['category']),
+            models.Index(fields=['difficulty']),
+            models.Index(fields=['is_active', '-usage_count']),
+        ]
+
+    def __str__(self):
+        return f'{self.name} ({self.category})'
+
+
+class Watchlist(models.Model):
+    """User watchlists for tracking symbols."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey('users.User', on_delete=models.CASCADE, related_name='watchlists')
+
+    name = models.CharField('Watchlist Name', max_length=255)
+    description = models.TextField('Description', blank=True)
+    symbols = models.JSONField('Symbols', default=list)
+
+    is_default = models.BooleanField('Is Default', default=False)
+    color = models.CharField('Color', max_length=20, default='blue')
+
+    created_at = models.DateTimeField('Created At', auto_now_add=True)
+    updated_at = models.DateTimeField('Updated At', auto_now=True)
+
+    class Meta:
+        db_table = 'watchlists'
+        verbose_name = 'Watchlist'
+        verbose_name_plural = 'Watchlists'
+        ordering = ['-is_default', 'name']
+        indexes = [
+            models.Index(fields=['user', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f'{self.user.email} - {self.name}'
+
+    def save(self, *args, **kwargs):
+        """Ensure only one default watchlist per user."""
+        if self.is_default:
+            # Set all other watchlists for this user to non-default
+            Watchlist.objects.filter(user=self.user, is_default=True).exclude(id=self.id).update(is_default=False)
+        super().save(*args, **kwargs)
