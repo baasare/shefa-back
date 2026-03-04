@@ -17,9 +17,12 @@ from user_agents import parse
 
 
 class GoogleLogin(SocialLoginView):
-    """Google OAuth2 login view."""
+    """
+    Google OAuth2 login view.
+    Accepts 'code' from frontend OAuth flow and exchanges it for tokens.
+    """
     adapter_class = GoogleOAuth2Adapter
-    callback_url = settings.FRONTEND_URL
+    callback_url = f"{settings.FRONTEND_URL}/callback"
     client_class = OAuth2Client
 
 

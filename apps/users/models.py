@@ -147,6 +147,21 @@ class User(AbstractUser):
         """Return a display-friendly name."""
         return self.get_full_name()
 
+    def soft_delete(self):
+        """Soft delete the user and free up unique fields."""
+        from django.utils import timezone
+
+        self.is_deleted = True
+        self.deleted_at = timezone.now()
+
+        # Append timestamp to username/email to free them up for reuse
+        if self.username:
+            self.username = f"{self.username}_deleted_{self.deleted_at.timestamp()}"
+        if self.email and not self.email.endswith('_deleted'):
+            self.email = f"{self.email}_deleted_{self.deleted_at.timestamp()}"
+
+        self.save()
+
 
 class UserProfile(models.Model):
     """Extended user profile information."""
