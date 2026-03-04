@@ -10,6 +10,10 @@ import uuid
 class UserManager(BaseUserManager):
     """Custom user manager for email-based authentication."""
 
+    def get_queryset(self):
+        """Return only non-deleted users by default."""
+        return super().get_queryset().filter(is_deleted=False)
+
     def create_user(self, email, password=None, **extra_fields):
         """Create and save a regular user."""
         if not email:
@@ -33,6 +37,14 @@ class UserManager(BaseUserManager):
             raise ValueError('Superuser must have is_superuser=True.')
 
         return self.create_user(email, password, **extra_fields)
+
+
+class AllUserManager(BaseUserManager):
+    """Manager to access all users including deleted ones."""
+
+    def get_queryset(self):
+        """Return all users including deleted ones."""
+        return super().get_queryset()
 
 
 class User(AbstractUser):
@@ -95,11 +107,14 @@ class User(AbstractUser):
     # Metadata
     is_active = models.BooleanField('Active', default=True)
     is_verified = models.BooleanField('Email Verified', default=False)
+    is_deleted = models.BooleanField('Deleted', default=False)
+    deleted_at = models.DateTimeField('Deleted At', blank=True, null=True)
     created_at = models.DateTimeField('Date Joined', auto_now_add=True)
     updated_at = models.DateTimeField('Last Updated', auto_now=True)
     last_login_ip = models.GenericIPAddressField('Last Login IP', blank=True, null=True)
 
     objects = UserManager()
+    all_objects = AllUserManager()
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = []

@@ -19,6 +19,10 @@ urlpatterns = [
     path('auth/profile/', views.user_profile, name='user_profile'),
     path('auth/profile/update/', views.update_profile, name='update_profile'),
 
+    # Account Management
+    path('auth/delete-account/', views.delete_account, name='delete_account'),
+    path('auth/active-sessions/', views.active_sessions, name='active_sessions'),
+
     # Router URLs
     path('', include(router.urls)),
 ]

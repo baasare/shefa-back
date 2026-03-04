@@ -14,14 +14,19 @@ class UserAdmin(BaseUserAdmin):
 
     list_display = [
         'email', 'display_name', 'risk_tolerance_badge', 'experience_level',
-        'is_verified', 'is_active', 'created_at'
+        'is_verified', 'is_active', 'is_deleted_badge', 'created_at'
     ]
     list_filter = [
-        'is_active', 'is_verified', 'is_staff', 'risk_tolerance',
+        'is_deleted', 'is_active', 'is_verified', 'is_staff', 'risk_tolerance',
         'experience_level', 'mfa_enabled', 'created_at'
     ]
     search_fields = ['email', 'first_name', 'last_name']
     ordering = ['-created_at']
+
+    def get_queryset(self, request):
+        """Override to show all users including deleted ones."""
+        # Use the all_objects manager to include deleted users
+        return User.all_objects.get_queryset()
 
     fieldsets = (
         (None, {'fields': ('email', 'password')}),
@@ -41,6 +46,9 @@ class UserAdmin(BaseUserAdmin):
         ('Permissions', {
             'fields': ('is_active', 'is_verified', 'is_staff', 'is_superuser', 'groups', 'user_permissions'),
         }),
+        ('Account Status', {
+            'fields': ('is_deleted', 'deleted_at'),
+        }),
         ('Important Dates', {
             'fields': ('last_login', 'created_at', 'updated_at', 'last_login_ip'),
             'classes': ('collapse',)
@@ -54,7 +62,7 @@ class UserAdmin(BaseUserAdmin):
         }),
     )
 
-    readonly_fields = ['created_at', 'updated_at']
+    readonly_fields = ['created_at', 'updated_at', 'deleted_at']
 
     def risk_tolerance_badge(self, obj):
         colors = {
@@ -69,6 +77,17 @@ class UserAdmin(BaseUserAdmin):
             obj.get_risk_tolerance_display()
         )
     risk_tolerance_badge.short_description = 'Risk Tolerance'
+
+    def is_deleted_badge(self, obj):
+        """Display deleted status with badge."""
+        if obj.is_deleted:
+            return format_html(
+                '<span style="background-color: #dc3545; color: white; padding: 3px 10px; border-radius: 3px;">DELETED</span>'
+            )
+        return format_html(
+            '<span style="background-color: #28a745; color: white; padding: 3px 10px; border-radius: 3px;">ACTIVE</span>'
+        )
+    is_deleted_badge.short_description = 'Account Status'
 
 
 @admin.register(UserProfile, site=secure_admin_site)
