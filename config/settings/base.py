@@ -150,6 +150,7 @@ REST_AUTH = {
     'JWT_AUTH_REFRESH_COOKIE': 'jwt-refresh-token',
     'JWT_AUTH_HTTPONLY': False,
     'REGISTER_SERIALIZER': 'apps.users.serializers.CustomRegisterSerializer',
+    'USER_DETAILS_SERIALIZER': 'apps.users.serializers.UserSerializer',
     'PASSWORD_RESET_USE_SITES_DOMAIN': False,
     'PASSWORD_RESET_SERIALIZER': 'apps.users.serializers.CustomPasswordResetSerializer',
     'PASSWORD_RESET_CONFIRM_SERIALIZER': 'apps.users.serializers.CustomPasswordResetConfirmSerializer',
