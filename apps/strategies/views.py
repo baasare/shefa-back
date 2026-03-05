@@ -8,17 +8,26 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from apps.strategies.models import Strategy, Backtest, StrategyTemplate, Watchlist
 from rest_framework.permissions import IsAuthenticated
+from rest_framework import filters
+from django_filters.rest_framework import DjangoFilterBackend
 from apps.strategies.serializers import (
     StrategySerializer, StrategyListSerializer, BacktestSerializer,
     StrategyTemplateSerializer, StrategyTemplateListSerializer,
     CreateStrategyFromTemplateSerializer, WatchlistSerializer, WatchlistListSerializer
 )
+from apps.strategies.pagination import StandardResultsSetPagination
 
 
 class StrategyViewSet(viewsets.ModelViewSet):
     """ViewSet for Strategy CRUD operations."""
     
     permission_classes = [IsAuthenticated]
+    pagination_class = StandardResultsSetPagination
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['status', 'strategy_type']
+    search_fields = ['name', 'description']
+    ordering_fields = ['name', 'created_at', 'win_rate', 'total_pnl', 'total_trades']
+    ordering = ['-created_at']
     
     def get_serializer_class(self):
         if self.action == 'list':
@@ -136,6 +145,12 @@ class StrategyTemplateViewSet(viewsets.ReadOnlyModelViewSet):
     """ViewSet for Strategy Templates (read-only for users)."""
 
     permission_classes = [IsAuthenticated]
+    pagination_class = StandardResultsSetPagination
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['category', 'difficulty', 'is_featured']
+    search_fields = ['name', 'description', 'tags']
+    ordering_fields = ['name', 'created_at', 'usage_count', 'expected_win_rate']
+    ordering = ['-usage_count']
 
     def get_serializer_class(self):
         if self.action == 'list':
