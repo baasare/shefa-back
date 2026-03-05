@@ -153,6 +153,7 @@ REST_AUTH = {
     'PASSWORD_RESET_USE_SITES_DOMAIN': False,
     'PASSWORD_RESET_SERIALIZER': 'apps.users.serializers.CustomPasswordResetSerializer',
     'PASSWORD_RESET_CONFIRM_SERIALIZER': 'apps.users.serializers.CustomPasswordResetConfirmSerializer',
+    'PASSWORD_CHANGE_SERIALIZER': 'apps.users.serializers.CustomPasswordChangeSerializer',
 }
 
 SIMPLE_JWT = {

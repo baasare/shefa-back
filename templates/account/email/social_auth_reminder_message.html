@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: 'Inter', Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 8px; }
+        .header { text-align: center; margin-bottom: 30px; }
+        .content { margin-bottom: 30px; }
+        .footer { font-size: 12px; color: #777; border-top: 1px solid #eee; padding-top: 20px; text-align: center; }
+        .button { display: inline-block; padding: 12px 24px; background-color: #007bff; color: white; text-decoration: none; border-radius: 4px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>ShefaFx Trading Platform</h2>
+        </div>
+        <div class="content">
+            <p>Hi <strong>{{ user.display_name }}</strong>,</p>
+            <p>You requested a password reset for your account on ShefaFx Trading Platform.</p>
+            <p>Our records show that your account is connected to your <strong>{{ provider }}</strong> account. Because of this, please continue to sign in with your social account. </p>
+            <p>If you need to change your password, you can do so in your <strong>{{ provider }}</strong> account settings.</p>
+            <p>If you believe this is an error or have any questions, please contact our support team at <a href="mailto:{{ support_email }}">{{ support_email }}</a>.</p>
+        </div>
+        <div class="footer">
+            <p>&copy; {% now "Y" %} ShefaFx Trading Platform. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

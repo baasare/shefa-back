@@ -1,0 +1,12 @@
+Hi {{ user.display_name }},
+
+You recently requested a password reset for your account on ShefaFx Trading Platform.
+
+Our records show that you usually sign in using your {{ provider }} account. Because of this, you don't have a separate password for our site.
+
+Please continue to sign in with {{ provider }}. If you need to change your password, you can do so in your {{ provider }} account settings.
+
+If you believe this is an error or have any questions, please contact our support team at {{ support_email }}.
+
+Best regards,
+The ShefaFx Trading Team

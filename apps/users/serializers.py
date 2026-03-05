@@ -4,7 +4,7 @@ User serializers for ShefaFx Trading Platform.
 from rest_framework import serializers
 from apps.users.models import User, UserProfile
 from dj_rest_auth.registration.serializers import RegisterSerializer
-from dj_rest_auth.serializers import JWTSerializer, PasswordResetSerializer, PasswordResetConfirmSerializer
+from dj_rest_auth.serializers import PasswordResetSerializer, PasswordResetConfirmSerializer, PasswordChangeSerializer
 from allauth.account.adapter import get_adapter
 from django.db import transaction
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
@@ -33,6 +33,7 @@ class UserSerializer(serializers.ModelSerializer):
     """Serializer for User model."""
     profile = UserProfileSerializer(read_only=False, required=False)
     full_name = serializers.CharField(source='get_full_name', read_only=True)
+    is_social_user = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -42,9 +43,13 @@ class UserSerializer(serializers.ModelSerializer):
             'mfa_enabled', 'approval_threshold',
             'email_notifications', 'push_notifications', 'sms_notifications',
             'is_active', 'is_verified', 'onboarding_completed', 'created_at', 'updated_at',
-            'profile'
+            'profile', 'is_social_user'
         ]
-        read_only_fields = ['id', 'email', 'created_at', 'updated_at', 'is_verified']
+        read_only_fields = ['id', 'email', 'created_at', 'updated_at', 'is_verified', 'is_social_user']
+
+    def get_is_social_user(self, obj):
+        """Check if user has any social accounts linked."""
+        return obj.socialaccount_set.exists()
 
     def update(self, instance, validated_data):
         """Update user and nested profile data."""
@@ -190,6 +195,23 @@ class CustomPasswordResetSerializer(PasswordResetSerializer):
         users = User.objects.filter(email__iexact=email, is_active=True)
 
         for user in users:
+            # Check if user has social accounts
+            social_accounts = user.socialaccount_set.all()
+            if social_accounts.exists():
+                context = {
+                    'user': user,
+                    'request': request,
+                    'provider': social_accounts.first().provider.title(),
+                    **opts.get('extra_email_context', {})
+                }
+                adapter = get_adapter()
+                adapter.send_mail(
+                    'account/email/social_auth_reminder',
+                    email,
+                    context
+                )
+                continue
+
             # Generate token
             uid = urlsafe_base64_encode(force_bytes(user.pk))
             token = default_token_generator.make_token(user)
@@ -265,3 +287,17 @@ class CustomPasswordResetConfirmSerializer(PasswordResetConfirmSerializer):
     def save(self):
         """Save the new password."""
         return self.set_password_form.save()
+
+
+class CustomPasswordChangeSerializer(PasswordChangeSerializer):
+    """
+    Custom password change serializer that prevents social users from changing password.
+    Directs them to change it at the source (e.g., Google).
+    """
+    def validate(self, attrs):
+        user = self.context['request'].user
+        if user.socialaccount_set.exists():
+            raise serializers.ValidationError(
+                "Your account is managed via Google. Please change your password in your Google Account settings."
+            )
+        return super().validate(attrs)
