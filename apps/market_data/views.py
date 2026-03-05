@@ -2,19 +2,37 @@
 Views for Agents, Market Data, Brokers, and Notifications.
 """
 from decimal import Decimal
-from rest_framework import viewsets
+from rest_framework import viewsets, generics
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
+from rest_framework.pagination import PageNumberPagination
 from django.db.models import Q, F
 
-from apps.market_data.models import Quote, Indicator, StockScreener
+from apps.market_data.models import Quote, Indicator, StockScreener, Watchlist
 from apps.market_data.serializers import (
     QuoteSerializer, IndicatorSerializer,
-    StockScreenerSerializer, StockScreenerListSerializer
+    StockScreenerSerializer, StockScreenerListSerializer,
+    WatchlistSerializer,
 )
 
+
+# ─── Pagination ───────────────────────────────────────────────────────────────
+
+class StandardResultsPagination(PageNumberPagination):
+    page_size = 20
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
+
+class SmallResultsPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = 'page_size'
+    max_page_size = 50
+
+
+# ─── Quotes ───────────────────────────────────────────────────────────────────
 
 class QuoteViewSet(viewsets.ReadOnlyModelViewSet):
     """Read-only ViewSet for market quotes."""
@@ -44,6 +62,8 @@ class QuoteViewSet(viewsets.ReadOnlyModelViewSet):
             'quotes': serializer.data
         })
 
+
+# ─── Indicators ───────────────────────────────────────────────────────────────
 
 class IndicatorViewSet(viewsets.ReadOnlyModelViewSet):
     """Read-only ViewSet for technical indicators."""
@@ -80,11 +100,14 @@ class IndicatorViewSet(viewsets.ReadOnlyModelViewSet):
         })
 
 
+# ─── Screener ─────────────────────────────────────────────────────────────────
+
 class StockScreenerViewSet(viewsets.ReadOnlyModelViewSet):
-    """ViewSet for Stock Screener with advanced filtering."""
+    """ViewSet for Stock Screener with advanced filtering and pagination."""
 
     permission_classes = [IsAuthenticated]
     queryset = StockScreener.objects.all()
+    pagination_class = StandardResultsPagination
 
     def get_serializer_class(self):
         if self.action == 'list':
@@ -95,14 +118,21 @@ class StockScreenerViewSet(viewsets.ReadOnlyModelViewSet):
         """Apply filters to screener data."""
         queryset = super().get_queryset()
 
-        # Symbol search
+        # Full-text search (symbol or name)
+        search = self.request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(
+                Q(symbol__icontains=search) | Q(name__icontains=search)
+            )
+
+        # Symbol filter
         symbol = self.request.query_params.get('symbol')
         if symbol:
             queryset = queryset.filter(symbol__icontains=symbol.upper())
 
         # Sector filter
         sector = self.request.query_params.get('sector')
-        if sector:
+        if sector and sector.lower() not in ('all', 'all sectors', ''):
             queryset = queryset.filter(sector__iexact=sector)
 
         # Industry filter
@@ -199,7 +229,7 @@ class StockScreenerViewSet(viewsets.ReadOnlyModelViewSet):
     def sectors(self, request):
         """Get list of available sectors."""
         sectors = StockScreener.objects.values_list('sector', flat=True).distinct().order_by('sector')
-        sectors = [s for s in sectors if s]  # Filter out empty strings
+        sectors = [s for s in sectors if s]
 
         return Response({
             'count': len(sectors),
@@ -210,7 +240,7 @@ class StockScreenerViewSet(viewsets.ReadOnlyModelViewSet):
     def industries(self, request):
         """Get list of available industries."""
         industries = StockScreener.objects.values_list('industry', flat=True).distinct().order_by('industry')
-        industries = [i for i in industries if i]  # Filter out empty strings
+        industries = [i for i in industries if i]
 
         return Response({
             'count': len(industries),
@@ -252,3 +282,79 @@ class StockScreenerViewSet(viewsets.ReadOnlyModelViewSet):
             'count': len(stocks),
             'stocks': serializer.data
         })
+
+
+# ─── Market Overview ──────────────────────────────────────────────────────────
+
+# Symbols to show in the market overview strip
+OVERVIEW_SYMBOLS = ['SPY', 'QQQ', 'BTC', 'ETH', 'GLD', 'VIX']
+OVERVIEW_LABELS = {
+    'SPY': 'S&P 500',
+    'QQQ': 'NASDAQ',
+    'BTC': 'BTC/USD',
+    'ETH': 'ETH/USD',
+    'GLD': 'Gold',
+    'VIX': 'VIX',
+}
+
+
+class MarketOverviewView(generics.GenericAPIView):
+    """Return market overview strip data for key indices and assets."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        results = []
+        stocks = StockScreener.objects.filter(symbol__in=OVERVIEW_SYMBOLS)
+        stock_map = {s.symbol: s for s in stocks}
+
+        for sym in OVERVIEW_SYMBOLS:
+            label = OVERVIEW_LABELS.get(sym, sym)
+            if sym in stock_map:
+                obj = stock_map[sym]
+                price = float(obj.price) if obj.price else 0
+                change_pct = float(obj.change_pct) if obj.change_pct else 0
+                results.append({
+                    'symbol': sym,
+                    'label': label,
+                    'value': f'${price:,.2f}',
+                    'change': f'{change_pct:+.2f}%',
+                    'positive': change_pct >= 0,
+                })
+            else:
+                results.append({
+                    'symbol': sym,
+                    'label': label,
+                    'value': '--',
+                    'change': '--',
+                    'positive': True,
+                })
+
+        return Response({'overview': results})
+
+
+# ─── Watchlist ────────────────────────────────────────────────────────────────
+
+class WatchlistViewSet(viewsets.ModelViewSet):
+    """User-scoped watchlist CRUD."""
+
+    permission_classes = [IsAuthenticated]
+    serializer_class = WatchlistSerializer
+    pagination_class = SmallResultsPagination
+    http_method_names = ['get', 'post', 'delete', 'head', 'options']
+
+    def get_queryset(self):
+        return Watchlist.objects.filter(user=self.request.user)
+
+    def create(self, request, *args, **kwargs):
+        # Check for duplicate
+        symbol = request.data.get('symbol', '').upper().strip()
+        if Watchlist.objects.filter(user=request.user, symbol=symbol).exists():
+            return Response(
+                {'error': f'{symbol} is already in your watchlist.'},
+                status=status.HTTP_409_CONFLICT
+            )
+        return super().create(request, *args, **kwargs)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)

@@ -2,7 +2,7 @@
 Market Data serializers for ShefaFx Trading Platform.
 """
 from rest_framework import serializers
-from apps.market_data.models import Quote, Indicator, StockScreener
+from apps.market_data.models import Quote, Indicator, StockScreener, Watchlist
 
 
 class QuoteSerializer(serializers.ModelSerializer):
@@ -44,6 +44,7 @@ class StockScreenerSerializer(serializers.ModelSerializer):
     price_vs_52w_low_pct = serializers.SerializerMethodField()
     above_sma_50 = serializers.SerializerMethodField()
     above_sma_200 = serializers.SerializerMethodField()
+    signal = serializers.SerializerMethodField()
 
     class Meta:
         model = StockScreener
@@ -52,7 +53,7 @@ class StockScreenerSerializer(serializers.ModelSerializer):
             'market_cap', 'pe_ratio', 'dividend_yield', 'rsi', 'sma_50', 'sma_200',
             'week_52_high', 'week_52_low', 'price_vs_52w_high_pct', 'price_vs_52w_low_pct',
             'above_sma_50', 'above_sma_200', 'sector', 'industry', 'exchange',
-            'last_updated', 'created_at'
+            'signal', 'last_updated', 'created_at'
         ]
         read_only_fields = ['id', 'last_updated', 'created_at']
 
@@ -80,6 +81,19 @@ class StockScreenerSerializer(serializers.ModelSerializer):
             return obj.price > obj.sma_200
         return None
 
+    def get_signal(self, obj):
+        """Derive a trading signal from RSI."""
+        if obj.rsi is None:
+            return 'Neutral'
+        rsi = float(obj.rsi)
+        if rsi >= 70:
+            return 'Sell'
+        elif rsi >= 50:
+            return 'Buy'
+        elif rsi >= 30:
+            return 'Hold'
+        return 'Neutral'
+
     def validate_symbol(self, value):
         """Validate and normalize symbol."""
         return value.upper().strip()
@@ -88,9 +102,41 @@ class StockScreenerSerializer(serializers.ModelSerializer):
 class StockScreenerListSerializer(serializers.ModelSerializer):
     """Lightweight serializer for stock screener lists."""
 
+    signal = serializers.SerializerMethodField()
+
     class Meta:
         model = StockScreener
         fields = [
             'id', 'symbol', 'name', 'price', 'change_pct', 'volume',
-            'market_cap', 'sector', 'rsi'
+            'market_cap', 'sector', 'rsi', 'pe_ratio', 'signal'
         ]
+
+    def get_signal(self, obj):
+        """Derive a trading signal from RSI."""
+        if obj.rsi is None:
+            return 'Neutral'
+        rsi = float(obj.rsi)
+        if rsi >= 70:
+            return 'Sell'
+        elif rsi >= 50:
+            return 'Buy'
+        elif rsi >= 30:
+            return 'Hold'
+        return 'Neutral'
+
+
+class WatchlistSerializer(serializers.ModelSerializer):
+    """Serializer for user's watchlist items."""
+
+    class Meta:
+        model = Watchlist
+        fields = ['id', 'symbol', 'name', 'asset_type', 'added_at']
+        read_only_fields = ['id', 'added_at']
+
+    def validate_symbol(self, value):
+        return value.upper().strip()
+
+    def create(self, validated_data):
+        user = self.context['request'].user
+        validated_data['user'] = user
+        return super().create(validated_data)

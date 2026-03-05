@@ -64,7 +64,9 @@ class StrategyAdmin(admin.ModelAdmin):
 
     def total_pnl_display(self, obj):
         color = 'green' if obj.total_pnl >= 0 else 'red'
-        return format_html('<span style="color: {};">${:,.2f}</span>', color, obj.total_pnl)
+        formatted_pnl = '${:,.2f}'.format(float(obj.total_pnl))
+        return format_html('<span style="color: {};">{}</span>', color, formatted_pnl)
+
     total_pnl_display.short_description = 'Total P&L'
 
     def activate_strategies(self, request, queryset):

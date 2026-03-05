@@ -2,6 +2,7 @@
 Market Data models for ShefaFx Trading Platform.
 """
 import uuid
+from django.conf import settings
 from django.db import models
 
 
@@ -124,3 +125,44 @@ class StockScreener(models.Model):
 
     def __str__(self):
         return f'{self.symbol} - {self.name}'
+
+
+class Watchlist(models.Model):
+    """Per-user watchlist of tracked market symbols."""
+
+    ASSET_TYPE_CHOICES = [
+        ('stock', 'Stock'),
+        ('crypto', 'Crypto'),
+        ('etf', 'ETF'),
+        ('index', 'Index'),
+        ('other', 'Other'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='watchlist_items'
+    )
+    symbol = models.CharField('Symbol', max_length=20)
+    name = models.CharField('Asset Name', max_length=255, blank=True, default='')
+    asset_type = models.CharField(
+        'Asset Type',
+        max_length=20,
+        choices=ASSET_TYPE_CHOICES,
+        default='stock'
+    )
+    added_at = models.DateTimeField('Added At', auto_now_add=True)
+
+    class Meta:
+        db_table = 'market_watchlist'
+        verbose_name = 'Watchlist Item'
+        verbose_name_plural = 'Watchlist Items'
+        ordering = ['-added_at']
+        unique_together = [['user', 'symbol']]
+        indexes = [
+            models.Index(fields=['user', '-added_at']),
+        ]
+
+    def __str__(self):
+        return f'{self.user_id} — {self.symbol}'

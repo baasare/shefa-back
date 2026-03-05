@@ -8,7 +8,7 @@ from decimal import Decimal
 from apps.users.models import User
 from apps.portfolios.models import Portfolio, Position
 
-email = 'asarebernard98@gmail.com'
+email = 'atiemoasare@gmail.com'
 
 try:
     user = User.objects.get(email=email)

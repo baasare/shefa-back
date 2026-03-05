@@ -4,7 +4,6 @@ import django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.development')
 django.setup()
 
-from django.utils import timezone
 from decimal import Decimal
 from apps.users.models import User, UserProfile
 from apps.portfolios.models import Portfolio, Position
@@ -44,24 +43,23 @@ else:
     print('✓ User profile already exists')
 
 # Create Portfolios
+# FIX 1: Use correct field names matching the Portfolio model
 portfolios_data = [
     {
         'name': 'Growth Portfolio',
-        'description': 'Aggressive growth focused on tech stocks',
+        'portfolio_type': 'live',        # was: is_paper_trading / status
         'initial_capital': Decimal('50000.00'),
-        'current_value': Decimal('54230.50'),
+        'total_equity': Decimal('54230.50'),  # was: current_value
         'cash_balance': Decimal('12000.00'),
-        'is_paper_trading': False,
-        'status': 'active',
+        'is_active': True,               # was: status: 'active'
     },
     {
         'name': 'Income Portfolio',
-        'description': 'Dividend-focused portfolio for steady income',
+        'portfolio_type': 'live',
         'initial_capital': Decimal('30000.00'),
-        'current_value': Decimal('31450.00'),
+        'total_equity': Decimal('31450.00'),
         'cash_balance': Decimal('5000.00'),
-        'is_paper_trading': False,
-        'status': 'active',
+        'is_active': True,
     },
 ]
 
@@ -80,51 +78,52 @@ for portfolio_data in portfolios_data:
 
 # Create Positions
 if len(created_portfolios) >= 2:
+    # FIX 2: Use correct field names, correct types, and add required cost_basis
     positions_data = [
         {
             'portfolio': created_portfolios[0],
             'symbol': 'AAPL',
-            'quantity': Decimal('100'),
-            'average_price': Decimal('175.50'),
+            'quantity': 100,                              # IntegerField, not Decimal
+            'avg_entry_price': Decimal('175.50'),         # was: average_price
             'current_price': Decimal('182.30'),
-            'position_type': 'long',
-            'status': 'open',
+            'side': 'long',                               # was: position_type
+            'cost_basis': Decimal('175.50') * 100,        # required field
         },
         {
             'portfolio': created_portfolios[0],
             'symbol': 'MSFT',
-            'quantity': Decimal('50'),
-            'average_price': Decimal('350.00'),
+            'quantity': 50,
+            'avg_entry_price': Decimal('350.00'),
             'current_price': Decimal('368.50'),
-            'position_type': 'long',
-            'status': 'open',
+            'side': 'long',
+            'cost_basis': Decimal('350.00') * 50,
         },
         {
             'portfolio': created_portfolios[0],
             'symbol': 'NVDA',
-            'quantity': Decimal('30'),
-            'average_price': Decimal('450.00'),
+            'quantity': 30,
+            'avg_entry_price': Decimal('450.00'),
             'current_price': Decimal('475.20'),
-            'position_type': 'long',
-            'status': 'open',
+            'side': 'long',
+            'cost_basis': Decimal('450.00') * 30,
         },
         {
             'portfolio': created_portfolios[1],
             'symbol': 'VZ',
-            'quantity': Decimal('200'),
-            'average_price': Decimal('40.00'),
+            'quantity': 200,
+            'avg_entry_price': Decimal('40.00'),
             'current_price': Decimal('41.50'),
-            'position_type': 'long',
-            'status': 'open',
+            'side': 'long',
+            'cost_basis': Decimal('40.00') * 200,
         },
         {
             'portfolio': created_portfolios[1],
             'symbol': 'T',
-            'quantity': Decimal('300'),
-            'average_price': Decimal('18.00'),
+            'quantity': 300,
+            'avg_entry_price': Decimal('18.00'),
             'current_price': Decimal('17.80'),
-            'position_type': 'long',
-            'status': 'open',
+            'side': 'long',
+            'cost_basis': Decimal('18.00') * 300,
         },
     ]
 
@@ -140,13 +139,14 @@ if len(created_portfolios) >= 2:
             print(f'✓ Position exists: {position.symbol}')
 
 # Create Strategies
+# FIX 3: 'value' is not a valid strategy_type choice — use 'custom' as fallback
 strategies_data = [
     {
         'name': 'Momentum Trading',
         'description': 'Buy stocks with strong momentum and sell on weakness',
         'strategy_type': 'momentum',
-        'is_active': True,
-        'parameters': {
+        'status': 'active',
+        'config': {
             'lookback_period': 20,
             'momentum_threshold': 0.05,
             'stop_loss': 0.02,
@@ -156,9 +156,9 @@ strategies_data = [
     {
         'name': 'Value Investing',
         'description': 'Identify undervalued stocks with strong fundamentals',
-        'strategy_type': 'value',
-        'is_active': True,
-        'parameters': {
+        'strategy_type': 'custom',       # was: 'value' (not a valid choice)
+        'status': 'active',
+        'config': {
             'pe_ratio_max': 15,
             'pb_ratio_max': 2.5,
             'dividend_yield_min': 0.03,
@@ -168,8 +168,8 @@ strategies_data = [
         'name': 'Mean Reversion',
         'description': 'Trade stocks that deviate from their mean',
         'strategy_type': 'mean_reversion',
-        'is_active': False,
-        'parameters': {
+        'status': 'inactive',
+        'config': {
             'std_dev_threshold': 2,
             'lookback_period': 30,
         },
@@ -191,17 +191,15 @@ for strategy_data in strategies_data:
 
 # Create Agents
 if len(created_portfolios) >= 2 and len(created_strategies) >= 2:
+    # FIX 4: Use only valid Agent model fields and valid agent_type choices
     agents_data = [
         {
             'name': 'Tech Trader',
             'description': 'AI agent specializing in technology stocks',
-            'agent_type': 'trading',
-            'status': 'active',
-            'portfolio': created_portfolios[0],
+            'agent_type': 'technical',    # was: 'trading' (invalid choice)
+            'is_active': True,            # was: status: 'active'
             'strategy': created_strategies[0],
-            'risk_level': 'moderate',
-            'max_position_size': Decimal('5000.00'),
-            'configuration': {
+            'data_config': {              # was: configuration
                 'symbols': ['AAPL', 'MSFT', 'NVDA', 'GOOGL'],
                 'trading_hours': 'market',
                 'max_trades_per_day': 5,
@@ -210,13 +208,10 @@ if len(created_portfolios) >= 2 and len(created_strategies) >= 2:
         {
             'name': 'Income Generator',
             'description': 'AI agent focused on dividend stocks',
-            'agent_type': 'income',
-            'status': 'active',
-            'portfolio': created_portfolios[1],
+            'agent_type': 'fundamental',  # was: 'income' (invalid choice)
+            'is_active': True,
             'strategy': created_strategies[1],
-            'risk_level': 'conservative',
-            'max_position_size': Decimal('3000.00'),
-            'configuration': {
+            'data_config': {
                 'min_dividend_yield': 0.04,
                 'sector_diversification': True,
             },
@@ -236,48 +231,43 @@ if len(created_portfolios) >= 2 and len(created_strategies) >= 2:
 
 # Create Orders
 if len(created_portfolios) >= 1:
+    # FIX 5: Remove 'user' (no FK on Order), fix field names, use int for quantity
     orders_data = [
         {
-            'user': user,
             'portfolio': created_portfolios[0],
             'symbol': 'AAPL',
             'order_type': 'market',
             'side': 'buy',
-            'quantity': Decimal('50'),
-            'price': Decimal('180.00'),
+            'quantity': 50,                           # IntegerField, not Decimal
             'status': 'filled',
-            'filled_quantity': Decimal('50'),
-            'filled_price': Decimal('180.25'),
+            'filled_qty': 50,                         # was: filled_quantity
+            'filled_avg_price': Decimal('180.25'),    # was: filled_price
         },
         {
-            'user': user,
             'portfolio': created_portfolios[0],
             'symbol': 'MSFT',
             'order_type': 'limit',
             'side': 'buy',
-            'quantity': Decimal('25'),
-            'price': Decimal('365.00'),
+            'quantity': 25,
+            'limit_price': Decimal('365.00'),         # was: price
             'status': 'filled',
-            'filled_quantity': Decimal('25'),
-            'filled_price': Decimal('365.00'),
+            'filled_qty': 25,
+            'filled_avg_price': Decimal('365.00'),
         },
         {
-            'user': user,
             'portfolio': created_portfolios[0],
             'symbol': 'NVDA',
             'order_type': 'market',
             'side': 'buy',
-            'quantity': Decimal('20'),
-            'price': Decimal('470.00'),
+            'quantity': 20,
             'status': 'pending',
-            'filled_quantity': Decimal('0'),
+            'filled_qty': 0,                          # was: Decimal('0')
         },
     ]
 
-    for i, order_data in enumerate(orders_data):
-        # Use a unique combination for get_or_create to avoid conflicts
+    for order_data in orders_data:
         order, created = Order.objects.get_or_create(
-            user=order_data['user'],
+            portfolio=order_data['portfolio'],
             symbol=order_data['symbol'],
             side=order_data['side'],
             quantity=order_data['quantity'],
