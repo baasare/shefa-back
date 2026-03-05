@@ -6,7 +6,7 @@ from rest_framework.routers import DefaultRouter
 from apps.agents import views
 
 router = DefaultRouter()
-router.register(r'agents', views.AgentViewSet, basename='agent')
+router.register(r'', views.AgentViewSet, basename='agent')
 router.register(r'runs', views.AgentRunViewSet, basename='agentrun')
 router.register(r'decisions', views.AgentDecisionViewSet, basename='agentdecision')
 router.register(r'logs', views.AgentLogViewSet, basename='agentlog')

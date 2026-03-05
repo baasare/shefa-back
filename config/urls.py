@@ -24,9 +24,9 @@ urlpatterns = [
     # App URLs (includes authentication)
     path('api/', include('apps.users.urls')),  # Includes /api/auth/ endpoints
     path('api/agents/', include('apps.agents.urls')),
-    path('api/portfolios/', include('apps.portfolios.urls')),
-    path('api/strategies/', include('apps.strategies.urls')),
-    path('api/orders/', include('apps.orders.urls')),
+    path('api/', include('apps.portfolios.urls')),
+    path('api/', include('apps.strategies.urls')),
+    path('api/', include('apps.orders.urls')),
     path('api/market-data/', include('apps.market_data.urls')),
     path('api/brokers/', include('apps.brokers.urls')),
     path('api/notifications/', include('apps.notifications.urls')),
