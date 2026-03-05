@@ -22,6 +22,7 @@ urlpatterns = [
     # Account Management
     path('auth/delete-account/', views.delete_account, name='delete_account'),
     path('auth/active-sessions/', views.active_sessions, name='active_sessions'),
+    path('auth/revoke-session/', views.revoke_session, name='revoke_session'),
 
     # Router URLs
     path('', include(router.urls)),

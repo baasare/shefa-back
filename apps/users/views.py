@@ -98,7 +98,7 @@ def active_sessions(request):
             location = session_data.get('location', 'Unknown')
 
             current_sessions.append({
-                'session_key': session.session_key[:10] + '...',  # Partial key for security
+                'session_key': session.session_key,
                 'expire_date': session.expire_date,
                 'is_current': session.session_key == request.session.session_key,
                 'device': f"{user_agent.device.family}",
@@ -112,3 +112,27 @@ def active_sessions(request):
         'active_sessions_count': len(current_sessions),
         'sessions': current_sessions
     }, status=status.HTTP_200_OK)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def revoke_session(request):
+    """Revoke a specific session."""
+    session_key = request.data.get('session_key')
+    if not session_key:
+        return Response({'error': 'Session key is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Protect current session
+    if session_key == request.session.session_key:
+        return Response({'error': 'Cannot revoke the current session'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        session = Session.objects.get(session_key=session_key)
+        session_data = session.get_decoded()
+
+        if session_data.get('_auth_user_id') == str(request.user.id):
+            session.delete()
+            return Response({'message': 'Session revoked successfully'}, status=status.HTTP_200_OK)
+        else:
+            return Response({'error': 'Unauthorized to revoke this session'}, status=status.HTTP_403_FORBIDDEN)
+    except Session.DoesNotExist:
+        return Response({'error': 'Session not found'}, status=status.HTTP_404_NOT_FOUND)
