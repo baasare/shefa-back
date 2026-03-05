@@ -1,11 +1,18 @@
 """
 Order views for ShefaFx Trading Platform.
 """
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, mixins
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.filters import SearchFilter, OrderingFilter
 import sentry_sdk
+
+class StandardResultsSetPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = 'page_size'
+    max_page_size = 100
 
 from apps.orders.models import Order, Trade
 from apps.orders.serializers import (
@@ -209,17 +216,39 @@ class OrderViewSet(viewsets.ModelViewSet):
         })
 
 
-class TradeViewSet(viewsets.ReadOnlyModelViewSet):
-    """Read-only ViewSet for Trade history."""
+class TradeViewSet(mixins.RetrieveModelMixin, mixins.ListModelMixin, mixins.DestroyModelMixin, viewsets.GenericViewSet):
+    """ViewSet for Trade history."""
     
     permission_classes = [IsAuthenticated]
     serializer_class = TradeSerializer
+    pagination_class = StandardResultsSetPagination
+    filter_backends = [SearchFilter, OrderingFilter]
+    search_fields = ['symbol', 'trade_type']
+    ordering_fields = ['executed_at', 'price', 'quantity', 'total_value', 'realized_pnl', 'realized_pnl_pct']
+    ordering = ['-executed_at']
     
     def get_queryset(self):
         """Return trades for authenticated user's portfolios."""
-        return Trade.objects.filter(
+        queryset = Trade.objects.filter(
             portfolio__user=self.request.user
         ).select_related('portfolio', 'strategy', 'order', 'position')
+        
+        # Determine time filter from query params
+        time_period = self.request.query_params.get('time_period')
+        if time_period and time_period.lower() != 'all':
+            from django.utils import timezone
+            from datetime import timedelta
+            now = timezone.now()
+            if time_period == '1W':
+                queryset = queryset.filter(executed_at__gte=now - timedelta(weeks=1))
+            elif time_period == '1M':
+                queryset = queryset.filter(executed_at__gte=now - timedelta(days=30))
+            elif time_period == '3M':
+                queryset = queryset.filter(executed_at__gte=now - timedelta(days=90))
+            elif time_period == '1Y':
+                queryset = queryset.filter(executed_at__gte=now - timedelta(days=365))
+                
+        return queryset
     
     @action(detail=False, methods=['get'])
     def by_symbol(self, request):
