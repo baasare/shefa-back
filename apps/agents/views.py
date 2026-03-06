@@ -5,13 +5,20 @@ Provides API endpoints for:
 1. Agent run history (AgentRun, AgentDecision, AgentLog models)
 2. Triggering agent analysis and autonomous trading
 3. Managing strategy autonomous trading settings
+4. Real-time log streaming via SSE
 """
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
+from django.http import StreamingHttpResponse
+from django.views.decorators.http import require_http_methods
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
 import logging
+import json
+import time
 
 from apps.agents.models import AgentRun, AgentDecision, AgentLog, Agent
 from apps.agents.serializers import (
@@ -64,6 +71,91 @@ class AgentLogViewSet(viewsets.ReadOnlyModelViewSet):
         return AgentLog.objects.filter(
             agent_run__strategy__user=self.request.user
         ).select_related('agent_run', 'agent_decision')
+
+    @action(detail=False, methods=['get'], url_path='stream')
+    def stream_logs(self, request):
+        """
+        Server-Sent Events (SSE) endpoint for real-time log streaming.
+
+        GET /api/agent-logs/stream/
+
+        Query parameters:
+        - agent_id: Filter logs by agent ID (optional)
+        - level: Filter by log level (info, warning, error, debug) (optional)
+
+        Returns SSE stream with:
+        - event: log
+        - data: JSON serialized log object
+
+        Compatible with Vercel AI SDK and EventSource API.
+        """
+        def event_stream():
+            """Generator function that yields SSE formatted data."""
+            # Get filter parameters
+            agent_id = request.GET.get('agent_id')
+            level = request.GET.get('level')
+
+            # Track last seen log ID to avoid duplicates
+            last_log_id = 0
+
+            # Send initial connection event
+            yield f"event: connected\ndata: {json.dumps({'status': 'connected', 'timestamp': time.time()})}\n\n"
+
+            while True:
+                try:
+                    # Build queryset with filters
+                    queryset = AgentLog.objects.filter(
+                        agent_run__strategy__user=request.user,
+                        id__gt=last_log_id
+                    ).select_related('agent_run__strategy', 'agent_decision')
+
+                    if agent_id:
+                        queryset = queryset.filter(agent_run__strategy__id=agent_id)
+
+                    if level:
+                        queryset = queryset.filter(level=level.lower())
+
+                    # Order by ID to get new logs
+                    new_logs = queryset.order_by('id')[:10]
+
+                    # Send new logs as SSE events
+                    for log in new_logs:
+                        log_data = {
+                            'id': log.id,
+                            'level': log.level,
+                            'message': log.message,
+                            'created_at': log.created_at.isoformat(),
+                            'agent_run': {
+                                'id': str(log.agent_run.id) if log.agent_run else None,
+                                'strategy': {
+                                    'id': str(log.agent_run.strategy.id) if log.agent_run and log.agent_run.strategy else None,
+                                    'name': log.agent_run.strategy.name if log.agent_run and log.agent_run.strategy else None,
+                                }
+                            } if log.agent_run else None,
+                        }
+
+                        # Send as SSE event
+                        yield f"event: log\ndata: {json.dumps(log_data)}\n\n"
+                        last_log_id = log.id
+
+                    # Send heartbeat to keep connection alive
+                    yield f"event: heartbeat\ndata: {json.dumps({'timestamp': time.time()})}\n\n"
+
+                    # Wait before checking for new logs
+                    time.sleep(2)
+
+                except Exception as e:
+                    logger.error(f"Error in SSE stream: {e}")
+                    yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
+                    break
+
+        response = StreamingHttpResponse(
+            event_stream(),
+            content_type='text/event-stream'
+        )
+        response['Cache-Control'] = 'no-cache'
+        response['X-Accel-Buffering'] = 'no'  # Disable nginx buffering
+        return response
 
 
 class AgentAnalysisViewSet(viewsets.ViewSet):
