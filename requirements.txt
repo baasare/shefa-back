@@ -32,11 +32,12 @@ django-celery-beat==2.9.0
 django-celery-results==2.6.0
 
 # LangGraph & AI
-langgraph==0.6.11
+langgraph==0.2.65
 langchain==0.3.27
 langchain-anthropic==0.3.22
 anthropic==0.84.0
 deepagents==0.4.4
+nest-asyncio==1.6.0
 
 # Market Data & Trading
 alpaca-py==0.43.2
