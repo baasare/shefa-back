@@ -16,6 +16,8 @@ init_sentry()
 
 ALLOWED_HOSTS = config("ALLOWED_HOSTS", cast=Csv())
 
+CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', cast=Csv())
+
 # Security settings
 SECURE_SSL_REDIRECT = True
 SESSION_COOKIE_SECURE = True
@@ -26,7 +28,6 @@ X_FRAME_OPTIONS = 'DENY'
 
 # CORS settings
 cors_origins = config('CORS_ALLOWED_ORIGINS', cast=Csv())
-CORS_ALLOWED_ORIGINS = [origin.strip() for origin in cors_origins.split(',') if origin.strip()]
 CORS_ALLOW_CREDENTIALS = True
 
 # Email settings - Using Resend for ALL emails (including django-allauth)
