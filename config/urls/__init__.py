@@ -2,7 +2,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import path
 
-from backend.core.admin_2fa import secure_admin_site
+from core.admin_2fa import secure_admin_site
 
 urlpatterns = [
     path('admin/', secure_admin_site.urls),
