@@ -3,6 +3,7 @@ Comprehensive logging configuration for files and cloud.
 
 Supports:
 - Local file logging with rotation
+- S3 storage for logs (Supabase) with time-based uploads
 - Cloud logging (AWS CloudWatch, Google Cloud Logging)
 - Structured logging with JSON format
 - Different log levels per component
@@ -13,6 +14,163 @@ import os
 from pathlib import Path
 import json
 from datetime import datetime
+import boto3
+from botocore.client import Config
+import threading
+import time
+import shutil
+
+
+class S3LogUploader:
+    """
+    Background uploader that periodically syncs local logs to S3.
+    """
+    
+    def __init__(self, log_path, environment='development', upload_interval=120):
+        """
+        Initialize S3 log uploader.
+        
+        Args:
+            log_path: Path to local log directory
+            environment: Environment name (development, production, etc.)
+            upload_interval: Seconds between uploads (default: 300 = 5 minutes)
+        """
+        self.log_path = Path(log_path)
+        self.environment = environment
+        self.upload_interval = upload_interval
+        self.s3_client = self._get_s3_client()
+        self.running = False
+        self.thread = None
+        
+    def _get_s3_client(self):
+        """Initialize S3 client for Supabase Storage."""
+        try:
+            s3_client = boto3.client(
+                's3',
+                endpoint_url=os.environ.get('S3_ENDPOINT'),
+                aws_access_key_id=os.environ.get('S3_ACCESS_KEY_ID'),
+                aws_secret_access_key=os.environ.get('S3_SECRET_ACCESS_KEY'),
+                region_name=os.environ.get('S3_REGION', 'us-east-1'),
+                config=Config(signature_version='s3v4')
+            )
+            return s3_client
+        except Exception as e:
+            print(f"Failed to initialize S3 client: {e}")
+            return None
+    
+    def start(self):
+        """Start the background upload thread."""
+        if self.s3_client and not self.running:
+            self.running = True
+            self.thread = threading.Thread(target=self._upload_loop, daemon=True)
+            self.thread.start()
+            print(f"S3 log uploader started (uploads every {self.upload_interval}s)")
+    
+    def stop(self):
+        """Stop the background upload thread."""
+        self.running = False
+        if self.thread:
+            self.thread.join(timeout=5)
+    
+    def _upload_loop(self):
+        """Background loop that uploads logs periodically."""
+        while self.running:
+            try:
+                self._upload_logs()
+            except Exception as e:
+                print(f"Error uploading logs to S3: {e}")
+            
+            # Sleep in small intervals to allow quick shutdown
+            for _ in range(self.upload_interval):
+                if not self.running:
+                    break
+                time.sleep(1)
+    
+    def _upload_logs(self):
+        """Upload all log files to S3."""
+        if not self.s3_client or not self.log_path.exists():
+            return
+        
+        bucket_name = os.environ.get('S3_BUCKET_NAME', 'shefa-logs')
+        timestamp = datetime.utcnow().strftime('%Y/%m/%d/%H')
+        
+        for log_file in self.log_path.glob('*.log*'):
+            if log_file.is_file() and log_file.stat().st_size > 0:
+                try:
+                    # Generate S3 key
+                    s3_key = f"{self.environment}/logs/{timestamp}/{log_file.name}"
+                    
+                    # Upload to S3
+                    self.s3_client.upload_file(
+                        str(log_file),
+                        bucket_name,
+                        s3_key
+                    )
+                    
+                    print(f"Uploaded {log_file.name} to S3: {s3_key}")
+                    
+                except Exception as e:
+                    print(f"Failed to upload {log_file.name}: {e}")
+
+
+class S3RotatingFileHandler(logging.handlers.RotatingFileHandler):
+    """
+    Rotating file handler with S3 upload on rotation (backup mechanism).
+    """
+
+    def __init__(self, *args, environment='development', **kwargs):
+        super().__init__(*args, **kwargs)
+        self.environment = environment
+        self.s3_client = self._get_s3_client()
+
+    def _get_s3_client(self):
+        """Initialize S3 client for Supabase Storage."""
+        try:
+            s3_client = boto3.client(
+                's3',
+                endpoint_url=os.environ.get('S3_ENDPOINT'),
+                aws_access_key_id=os.environ.get('S3_ACCESS_KEY_ID'),
+                aws_secret_access_key=os.environ.get('S3_SECRET_ACCESS_KEY'),
+                region_name=os.environ.get('S3_REGION', 'us-east-1'),
+                config=Config(signature_version='s3v4')
+            )
+            return s3_client
+        except Exception as e:
+            logging.error(f"Failed to initialize S3 client: {e}")
+            return None
+
+    def doRollover(self):
+        """
+        Override doRollover to upload rotated log to S3.
+        """
+        super().doRollover()
+
+        # Upload the rotated file to S3
+        if self.s3_client:
+            try:
+                # The rotated file will have a .1 extension
+                rotated_file = f"{self.baseFilename}.1"
+                if os.path.exists(rotated_file):
+                    # Generate S3 key with environment and timestamp
+                    timestamp = datetime.utcnow().strftime('%Y/%m/%d/%H')
+                    filename = Path(rotated_file).name
+                    s3_key = f"{self.environment}/logs/rotated/{timestamp}/{filename}"
+
+                    # Upload to S3
+                    bucket_name = os.environ.get('S3_BUCKET_NAME', 'shefa-logs')
+                    self.s3_client.upload_file(
+                        rotated_file,
+                        bucket_name,
+                        s3_key
+                    )
+
+                    logging.info(f"Uploaded rotated log to S3: {s3_key}")
+
+                    # Delete local rotated file to save space
+                    os.remove(rotated_file)
+
+            except Exception as e:
+                logging.error(f"Failed to upload log to S3: {e}")
 
 
 class JSONFormatter(logging.Formatter):
@@ -52,17 +210,24 @@ class JSONFormatter(logging.Formatter):
         return json.dumps(log_data)
 
 
-def setup_logging(log_dir='logs', environment='development'):
+def setup_logging(log_dir='logs', environment='development', upload_interval=300):
     """
     Setup comprehensive logging configuration.
 
     Args:
         log_dir: Directory for log files
         environment: Environment name (development, staging, production)
+        upload_interval: Seconds between S3 uploads (default: 300 = 5 minutes)
     """
-    # Create log directory
-    log_path = Path(log_dir)
-    log_path.mkdir(exist_ok=True)
+    # Create log directory with absolute path
+    if not os.path.isabs(log_dir):
+        # Convert relative path to absolute based on project root
+        base_dir = Path(__file__).resolve().parent.parent.parent
+        log_path = base_dir / log_dir
+    else:
+        log_path = Path(log_dir)
+    
+    log_path.mkdir(parents=True, exist_ok=True)
 
     # Root logger configuration
     root_logger = logging.getLogger()
@@ -82,7 +247,11 @@ def setup_logging(log_dir='logs', environment='development'):
         root_logger.addHandler(console_handler)
 
     # File handlers with rotation
-    setup_file_handlers(log_path, root_logger)
+    setup_file_handlers(log_path, root_logger, environment)
+
+    # Start S3 uploader (uploads logs periodically)
+    uploader = S3LogUploader(log_path, environment, upload_interval)
+    uploader.start()
 
     # Cloud logging handlers
     if environment in ['staging', 'production']:
@@ -94,34 +263,37 @@ def setup_logging(log_dir='logs', environment='development'):
     logging.info(f"Logging configured for environment: {environment}")
 
 
-def setup_file_handlers(log_path, root_logger):
-    """Setup file handlers with rotation."""
+def setup_file_handlers(log_path, root_logger, environment='development'):
+    """Setup file handlers with rotation and S3 upload on rotate."""
 
     # General application log
-    general_handler = logging.handlers.RotatingFileHandler(
+    general_handler = S3RotatingFileHandler(
         log_path / 'app.log',
-        maxBytes=10 * 1024 * 1024,  # 10MB
-        backupCount=10
+        maxBytes=5 * 1024 * 1024,  # 10MB
+        backupCount=10,
+        environment=environment
     )
     general_handler.setLevel(logging.INFO)
     general_handler.setFormatter(JSONFormatter())
     root_logger.addHandler(general_handler)
 
     # Error log
-    error_handler = logging.handlers.RotatingFileHandler(
+    error_handler = S3RotatingFileHandler(
         log_path / 'errors.log',
-        maxBytes=10 * 1024 * 1024,
-        backupCount=10
+        maxBytes=5 * 1024 * 1024,
+        backupCount=10,
+        environment=environment
     )
     error_handler.setLevel(logging.ERROR)
     error_handler.setFormatter(JSONFormatter())
     root_logger.addHandler(error_handler)
 
     # Trading activity log (critical for audit)
-    trading_handler = logging.handlers.RotatingFileHandler(
+    trading_handler = S3RotatingFileHandler(
         log_path / 'trading.log',
-        maxBytes=50 * 1024 * 1024,  # 50MB
-        backupCount=20
+        maxBytes=5 * 1024 * 1024,  # 50MB
+        backupCount=20,
+        environment=environment
     )
     trading_handler.setLevel(logging.INFO)
     trading_handler.setFormatter(JSONFormatter())
@@ -134,10 +306,11 @@ def setup_file_handlers(log_path, root_logger):
     root_logger.addHandler(trading_handler)
 
     # Security log
-    security_handler = logging.handlers.RotatingFileHandler(
+    security_handler = S3RotatingFileHandler(
         log_path / 'security.log',
-        maxBytes=10 * 1024 * 1024,
-        backupCount=20
+        maxBytes=5 * 1024 * 1024,
+        backupCount=20,
+        environment=environment
     )
     security_handler.setLevel(logging.WARNING)
     security_handler.setFormatter(JSONFormatter())
@@ -201,7 +374,7 @@ def setup_gcp_logging(root_logger, environment):
 def setup_component_loggers():
     """Setup component-specific loggers with custom levels."""
 
-    # Orders logger (CRITICAL)
+    # Orders logger
     orders_logger = logging.getLogger('apps.orders')
     orders_logger.setLevel(logging.DEBUG)
 
@@ -213,7 +386,7 @@ def setup_component_loggers():
     market_data_logger = logging.getLogger('apps.market_data')
     market_data_logger.setLevel(logging.INFO)
 
-    # Brokers logger (CRITICAL)
+    # Brokers logger
     brokers_logger = logging.getLogger('apps.brokers')
     brokers_logger.setLevel(logging.DEBUG)
 
@@ -226,105 +399,120 @@ def setup_component_loggers():
     celery_logger.setLevel(logging.INFO)
 
 
-# Logging configuration for settings.py
-LOGGING_CONFIG = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'verbose': {
-            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
-            'style': '{',
+def get_logging_config():
+    """
+    Generate logging configuration with proper log directory creation.
+    
+    Returns:
+        dict: Logging configuration dictionary
+    """
+    # Ensure logs directory exists (production-safe)
+    base_dir = Path(__file__).resolve().parent.parent.parent
+    log_dir = base_dir / 'logs'
+    log_dir.mkdir(parents=True, exist_ok=True)
+    
+    return {
+        'version': 1,
+        'disable_existing_loggers': False,
+        'formatters': {
+            'verbose': {
+                'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+                'style': '{',
+            },
+            'simple': {
+                'format': '{levelname} {message}',
+                'style': '{',
+            },
+            'json': {
+                '()': 'core.monitoring.logging_config.JSONFormatter',
+            },
         },
-        'simple': {
-            'format': '{levelname} {message}',
-            'style': '{',
+        'filters': {
+            'require_debug_false': {
+                '()': 'django.utils.log.RequireDebugFalse',
+            },
+            'require_debug_true': {
+                '()': 'django.utils.log.RequireDebugTrue',
+            },
         },
-        'json': {
-            '()': 'core.monitoring.logging_config.JSONFormatter',
+        'handlers': {
+            'console': {
+                'level': 'INFO',
+                'filters': ['require_debug_true'],
+                'class': 'logging.StreamHandler',
+                'formatter': 'verbose'
+            },
+            'file': {
+                'level': 'INFO',
+                'class': 'logging.handlers.RotatingFileHandler',
+                'filename': str(log_dir / 'app.log'),
+                'maxBytes': 10485760,  # 10MB
+                'backupCount': 10,
+                'formatter': 'json',
+            },
+            'error_file': {
+                'level': 'ERROR',
+                'class': 'logging.handlers.RotatingFileHandler',
+                'filename': str(log_dir / 'errors.log'),
+                'maxBytes': 10485760,
+                'backupCount': 10,
+                'formatter': 'json',
+            },
+            'trading_file': {
+                'level': 'INFO',
+                'class': 'logging.handlers.RotatingFileHandler',
+                'filename': str(log_dir / 'trading.log'),
+                'maxBytes': 52428800,  # 50MB
+                'backupCount': 20,
+                'formatter': 'json',
+            },
+            'security_file': {
+                'level': 'WARNING',
+                'class': 'logging.handlers.RotatingFileHandler',
+                'filename': str(log_dir / 'security.log'),
+                'maxBytes': 10485760,
+                'backupCount': 20,
+                'formatter': 'json',
+            },
         },
-    },
-    'filters': {
-        'require_debug_false': {
-            '()': 'django.utils.log.RequireDebugFalse',
+        'loggers': {
+            'django': {
+                'handlers': ['console', 'file', 'error_file'],
+                'level': 'INFO',
+                'propagate': False,
+            },
+            'apps.orders': {
+                'handlers': ['console', 'file', 'trading_file', 'error_file'],
+                'level': 'DEBUG',
+                'propagate': False,
+            },
+            'apps.strategies': {
+                'handlers': ['console', 'file', 'trading_file'],
+                'level': 'INFO',
+                'propagate': False,
+            },
+            'apps.brokers': {
+                'handlers': ['console', 'file', 'security_file', 'error_file'],
+                'level': 'DEBUG',
+                'propagate': False,
+            },
+            'apps.portfolios': {
+                'handlers': ['console', 'file', 'trading_file'],
+                'level': 'INFO',
+                'propagate': False,
+            },
+            'celery': {
+                'handlers': ['console', 'file', 'error_file'],
+                'level': 'INFO',
+                'propagate': False,
+            },
         },
-        'require_debug_true': {
-            '()': 'django.utils.log.RequireDebugTrue',
-        },
-    },
-    'handlers': {
-        'console': {
-            'level': 'INFO',
-            'filters': ['require_debug_true'],
-            'class': 'logging.StreamHandler',
-            'formatter': 'verbose'
-        },
-        'file': {
-            'level': 'INFO',
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': 'logs/app.log',
-            'maxBytes': 10485760,  # 10MB
-            'backupCount': 10,
-            'formatter': 'json',
-        },
-        'error_file': {
-            'level': 'ERROR',
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': 'logs/errors.log',
-            'maxBytes': 10485760,
-            'backupCount': 10,
-            'formatter': 'json',
-        },
-        'trading_file': {
-            'level': 'INFO',
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': 'logs/trading.log',
-            'maxBytes': 52428800,  # 50MB
-            'backupCount': 20,
-            'formatter': 'json',
-        },
-        'security_file': {
-            'level': 'WARNING',
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': 'logs/security.log',
-            'maxBytes': 10485760,
-            'backupCount': 20,
-            'formatter': 'json',
-        },
-    },
-    'loggers': {
-        'django': {
+        'root': {
             'handlers': ['console', 'file', 'error_file'],
             'level': 'INFO',
-            'propagate': False,
         },
-        'apps.orders': {
-            'handlers': ['console', 'file', 'trading_file', 'error_file'],
-            'level': 'DEBUG',
-            'propagate': False,
-        },
-        'apps.strategies': {
-            'handlers': ['console', 'file', 'trading_file'],
-            'level': 'INFO',
-            'propagate': False,
-        },
-        'apps.brokers': {
-            'handlers': ['console', 'file', 'security_file', 'error_file'],
-            'level': 'DEBUG',
-            'propagate': False,
-        },
-        'apps.portfolios': {
-            'handlers': ['console', 'file', 'trading_file'],
-            'level': 'INFO',
-            'propagate': False,
-        },
-        'celery': {
-            'handlers': ['console', 'file', 'error_file'],
-            'level': 'INFO',
-            'propagate': False,
-        },
-    },
-    'root': {
-        'handlers': ['console', 'file', 'error_file'],
-        'level': 'INFO',
-    },
-}
+    }
+
+
+# For backward compatibility
+LOGGING_CONFIG = get_logging_config()
