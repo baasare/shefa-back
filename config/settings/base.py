@@ -2,7 +2,7 @@
 Base settings for ShefaFx Trading Platform.
 """
 from pathlib import Path
-from decouple import config
+from decouple import config, Csv
 from datetime import timedelta
 
 # Build paths

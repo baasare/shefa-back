@@ -14,8 +14,7 @@ if sentry_dsn:
 
 init_sentry()
 
-allowed_hosts = config('ALLOWED_HOSTS', default='')
-ALLOWED_HOSTS = [host.strip() for host in allowed_hosts.split(',') if host.strip()]
+ALLOWED_HOSTS = config("ALLOWED_HOSTS", cast=Csv())
 
 # Security settings
 SECURE_SSL_REDIRECT = True
@@ -26,7 +25,7 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
 
 # CORS settings
-cors_origins = config('CORS_ALLOWED_ORIGINS', default='')
+cors_origins = config('CORS_ALLOWED_ORIGINS', cast=Csv())
 CORS_ALLOWED_ORIGINS = [origin.strip() for origin in cors_origins.split(',') if origin.strip()]
 CORS_ALLOW_CREDENTIALS = True
 
