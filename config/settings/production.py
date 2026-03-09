@@ -42,8 +42,7 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 
-# Resend configuration is loaded in base.py
-# All emails (django-allauth + app notifications) now use Resend
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Sentry integration
 SENTRY_DSN = config('SENTRY_DSN', default='')
