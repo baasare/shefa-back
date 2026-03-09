@@ -27,6 +27,7 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
+    'django_hosts',
     'drf_spectacular',
     'django_json_widget',
 
@@ -55,6 +56,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'django_hosts.middleware.HostsRequestMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -166,6 +168,9 @@ SIMPLE_JWT = {
     'SIGNING_KEY': SECRET_KEY,
     'TOKEN_REFRESH_SERIALIZER': 'apps.users.serializers.CustomTokenRefreshSerializer',
 }
+
+ROOT_HOSTCONF = 'config.hosts'
+DEFAULT_HOST = 'www'
 
 # Django Allauth Configuration
 ACCOUNT_AUTHENTICATION_METHOD = 'email'
