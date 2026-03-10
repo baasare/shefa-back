@@ -17,19 +17,19 @@ urlpatterns = [
     path('admin/', secure_admin_site.urls),
 
     # API Documentation
-    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
-    path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
-    path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
+    path('api/schema/', SpectacularAPIView.as_view(urlconf='config.urls'), name='root-schema'),
+    path('api/docs/', SpectacularSwaggerView.as_view(url_name='root-schema'), name='root-swagger-ui'),
+    path('api/redoc/', SpectacularRedocView.as_view(url_name='root-schema'), name='root-redoc'),
 
     # App URLs (includes authentication)
-    path('api/', include('apps.users.urls')),  # Includes /api/auth/ endpoints
-    path('api/agents/', include('apps.agents.urls')),
-    path('api/', include('apps.portfolios.urls')),
-    path('api/', include('apps.strategies.urls')),
-    path('api/', include('apps.orders.urls')),
-    path('api/market-data/', include('apps.market_data.urls')),
-    path('api/brokers/', include('apps.brokers.urls')),
-    path('api/notifications/', include('apps.notifications.urls')),
+    path('api/v1/auth/', include('apps.users.urls')),
+    path('api/v1/agents/', include('apps.agents.urls')),
+    path('api/v1/portfolios/', include('apps.portfolios.urls')),
+    path('api/v1/strategies/', include('apps.strategies.urls')),
+    path('api/v1/orders/', include('apps.orders.urls')),
+    path('api/v1/market-data/', include('apps.market_data.urls')),
+    path('api/v1/brokers/', include('apps.brokers.urls')),
+    path('api/v1/notifications/', include('apps.notifications.urls')),
 ]
 
 # Serve media files in development
