@@ -60,7 +60,7 @@ watchtower==3.4.0
 resend==2.23.0
 
 # Monitoring & Logging (optional)
-sentry-sdk==1.45.1
+sentry-sdk==2.54.0
 
 # Development
 django-extensions==3.2.3
