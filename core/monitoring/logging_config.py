@@ -411,7 +411,7 @@ def get_logging_config():
     log_dir = base_dir / 'logs'
     log_dir.mkdir(parents=True, exist_ok=True)
     
-    return {
+    config = {
         'version': 1,
         'disable_existing_loggers': False,
         'formatters': {
@@ -444,7 +444,7 @@ def get_logging_config():
             },
             'file': {
                 'level': 'INFO',
-                'class': 'logging.handlers.RotatingFileHandler',
+                'class': 'core.monitoring.logging_config.S3RotatingFileHandler',
                 'filename': str(log_dir / 'app.log'),
                 'maxBytes': 10485760,  # 10MB
                 'backupCount': 10,
@@ -452,7 +452,7 @@ def get_logging_config():
             },
             'error_file': {
                 'level': 'ERROR',
-                'class': 'logging.handlers.RotatingFileHandler',
+                'class': 'core.monitoring.logging_config.S3RotatingFileHandler',
                 'filename': str(log_dir / 'errors.log'),
                 'maxBytes': 10485760,
                 'backupCount': 10,
@@ -460,7 +460,7 @@ def get_logging_config():
             },
             'trading_file': {
                 'level': 'INFO',
-                'class': 'logging.handlers.RotatingFileHandler',
+                'class': 'core.monitoring.logging_config.S3RotatingFileHandler',
                 'filename': str(log_dir / 'trading.log'),
                 'maxBytes': 52428800,  # 50MB
                 'backupCount': 20,
@@ -468,7 +468,7 @@ def get_logging_config():
             },
             'security_file': {
                 'level': 'WARNING',
-                'class': 'logging.handlers.RotatingFileHandler',
+                'class': 'core.monitoring.logging_config.S3RotatingFileHandler',
                 'filename': str(log_dir / 'security.log'),
                 'maxBytes': 10485760,
                 'backupCount': 20,
@@ -512,6 +512,13 @@ def get_logging_config():
             'level': 'INFO',
         },
     }
+
+    # Start the background S3 log uploader
+    environment = os.environ.get('ENVIRONMENT', 'development')
+    uploader = S3LogUploader(log_dir, environment=environment, upload_interval=300)
+    uploader.start()
+
+    return config
 
 
 # For backward compatibility
