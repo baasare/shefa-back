@@ -25,6 +25,7 @@ def init_sentry():
 
     sentry_sdk.init(
         dsn=sentry_dsn,
+        enable_logs=True,
         environment=environment,
 
         # Integrations

@@ -28,7 +28,7 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
 
 # CORS settings
-cors_origins = config('CORS_ALLOWED_ORIGINS', cast=Csv())
+CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', cast=Csv())
 CORS_ALLOW_CREDENTIALS = True
 
 # Email settings - Using Resend for ALL emails (including django-allauth)
@@ -50,5 +50,6 @@ if SENTRY_DSN and SENTRY_DSN.startswith(('http://', 'https://')):
     import sentry_sdk
     sentry_sdk.init(
         dsn=SENTRY_DSN,
+        enable_logs=True,
         traces_sample_rate=0.1,
     )
