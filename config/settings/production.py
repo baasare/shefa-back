@@ -33,7 +33,7 @@ CORS_ALLOW_CREDENTIALS = True
 
 # Email settings - Using Resend for ALL emails (including django-allauth)
 EMAIL_BACKEND = 'core.email_backends.ResendEmailBackend'
-DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@shefaai.com')
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@shefafx.com')
 
 # SMTP settings (kept as fallback, not used when Resend backend is active)
 EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')

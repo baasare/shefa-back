@@ -21,7 +21,7 @@ class CustomAccountAdapter(DefaultAccountAdapter):
         Returns:
             Formatted from email with name
         """
-        from_email = getattr(settings, 'RESEND_FROM_EMAIL', 'noreply@shefaai.com')
+        from_email = getattr(settings, 'RESEND_FROM_EMAIL', 'noreply@shefafx.com')
         from_name = getattr(settings, 'RESEND_FROM_NAME', 'ShefaFx Trading')
         return f"{from_name} <{from_email}>"
 
@@ -34,13 +34,24 @@ class CustomAccountAdapter(DefaultAccountAdapter):
             email: Recipient email address
             context: Template context dictionary
         """
+        # Allauth uses a distinct prefix for the initial signup message.
+        if template_prefix == 'account/email/email_confirmation_signup':
+            template_prefix = 'account/email/email_confirmation'
         # Add custom context variables
         context['site_name'] = 'ShefaFx Trading Platform'
         context['site_url'] = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
-        context['support_email'] = 'support@shefaai.com'
+        context['support_email'] = 'support@shefafx.com'
+        context['expiration_days'] = settings.ACCOUNT_EMAIL_CONFIRMATION_EXPIRE_DAYS
 
         # Call parent implementation
-        return super().send_mail(template_prefix, email, context)
+        try:
+            return super().send_mail(template_prefix, email, context)
+        except Exception:
+            # Do not expose provider responses, credentials or recipient details.
+            from rest_framework.exceptions import APIException
+            error = APIException('We could not send the email right now. Please try again shortly.')
+            error.status_code = 503
+            raise error from None
 
     def get_email_confirmation_url(self, request, emailconfirmation):
         """

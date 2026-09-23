@@ -98,7 +98,11 @@ class CustomRegisterSerializer(RegisterSerializer):
                 "Please contact support to restore your account or use a different email address."
             )
 
-        return email
+        if User.objects.filter(email__iexact=email).exists():
+            raise serializers.ValidationError(
+                "An account already exists for this email. Sign in or request a new verification link."
+            )
+        return super().validate_email(email)
 
     def get_cleaned_data(self):
         """

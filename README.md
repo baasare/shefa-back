@@ -184,3 +184,26 @@ See `.env.example` for all required environment variables.
 ## License
 
 Proprietary - All rights reserved
+
+### Production authentication
+
+Use `https://shefafx.com` as the frontend origin. The `app` and `www` aliases redirect
+there so browser sessions remain on one origin. Registration requires email
+verification and does not return JWTs; after confirming the email, sign in to
+continue onboarding. Failed delivery rolls back a new registration and returns an
+actionable 503. Existing unverified accounts can use `/verify-email` to resend.
+
+Render requires `RESEND_API_KEY`, `RESEND_FROM_EMAIL=noreply@shefafx.com`,
+`DEFAULT_FROM_EMAIL=noreply@shefafx.com`, `GOOGLE_OAUTH_CLIENT_ID`, and
+`GOOGLE_OAUTH_CLIENT_SECRET`. Verify the domain in Resend before enabling email
+signup. Never commit these secrets. Authentication email templates live under
+`templates/account/email/` and are rendered by Django, then sent through Resend.
+
+Google must allow `https://shefafx.com/callback` (and
+`http://localhost:3000/callback` for local work). The frontend obtains the OAuth
+URL from `GET /v1/auth/google/start/`; the API binds state and PKCE to its session
+cookie and accepts a one-time, ten-minute callback via `POST /v1/auth/google/`.
+Set `FRONTEND_URL` to the matching frontend origin. Only basic identity scopes
+are requested. No Google client secret belongs in Vercel.
+
+Auth regression tests: `python manage.py test apps.users.test_auth_flow --settings=config.settings.test`.

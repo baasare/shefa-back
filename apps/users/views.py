@@ -1,9 +1,6 @@
 """
 Authentication views for ShefaFx Trading Platform.
 """
-from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
-from allauth.socialaccount.providers.oauth2.client import OAuth2Client
-from dj_rest_auth.registration.views import SocialLoginView
 from config import settings
 from django.contrib.sessions.models import Session
 from django.utils import timezone
@@ -14,16 +11,6 @@ from rest_framework.response import Response
 from user_agents import parse
 
 
-
-
-class GoogleLogin(SocialLoginView):
-    """
-    Google OAuth2 login view.
-    Accepts 'code' from frontend OAuth flow and exchanges it for tokens.
-    """
-    adapter_class = GoogleOAuth2Adapter
-    callback_url = f"{settings.FRONTEND_URL}/callback"
-    client_class = OAuth2Client
 
 
 @api_view(['GET'])
