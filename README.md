@@ -83,6 +83,27 @@ python manage.py createsuperuser
 python manage.py runserver
 ```
 
+## Render deployment with Supabase
+
+Use `render.yaml` to create the free API service. Set the database fields from
+Supabase's **Connect → Session pooler** panel (port 5432); enter the database
+password only in Render's environment settings. This deployment requires TLS.
+Disable Supabase's Data API for this Django-managed database, unless separately
+configured with appropriate grants and row-level security.
+
+Set `FRONTEND_URL`, `CORS_ALLOWED_ORIGINS`, and `CSRF_TRUSTED_ORIGINS` to the
+Vercel production origin, including `https://`. Set Vercel's
+`NEXT_PUBLIC_API_URL` to the Render origin without a path prefix and
+`NEXT_PUBLIC_APP_URL` to the Vercel origin. API routes are `/v1/`, `/docs/`, and
+`/health/`. Render automatically adds its hostname to Django's allowed hosts.
+
+The start command applies migrations before serving requests. Free Render web
+services sleep when idle. This blueprint does not provision Celery workers,
+Redis, or scheduled trading; those need separate services. Configure Resend and
+the provider credentials in Render before using email verification, AI, or
+market-data features. Never put backend secrets in Vercel's `NEXT_PUBLIC_*`
+variables.
+
 ## Running Celery
 
 ### Start Celery worker

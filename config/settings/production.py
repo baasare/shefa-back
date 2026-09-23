@@ -5,7 +5,7 @@ from .base import *
 from core.monitoring.sentry_config import init_sentry
 import os
 
-DEBUG = config('DEBUG', default='')
+DEBUG = config('DEBUG', default=False, cast=bool)
 
 # Load SENTRY_DSN into os.environ so init_sentry() can access it
 sentry_dsn = config('SENTRY_DSN', default='')

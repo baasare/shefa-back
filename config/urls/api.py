@@ -6,8 +6,10 @@ from drf_spectacular.views import (
 )
 
 from core.admin_2fa import secure_admin_site
+from core.health import health
 
 urlpatterns = [
+    path('health/', health, name='health'),
     # Admin
     path('admin/', secure_admin_site.urls, name="admin"),
     # API Documentation
