@@ -26,4 +26,5 @@ urlpatterns = [
     path('v1/market-data/', include('apps.market_data.urls')),
     path('v1/brokers/', include('apps.brokers.urls')),
     path('v1/notifications/', include('apps.notifications.urls')),
+    path('v1/bots/', include('apps.bots.urls')),
 ]

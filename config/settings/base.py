@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     'apps.market_data',
     'apps.brokers',
     'apps.notifications',
+    'apps.bots',
 ]
 
 MIDDLEWARE = [
@@ -234,6 +235,7 @@ CELERY_BROKER_URL = config('REDIS_URL', default='redis://localhost:6379/0')
 CELERY_RESULT_BACKEND = 'django-db'
 
 ANTHROPIC_API_KEY = config('ANTHROPIC_API_KEY', default='')
+BOT_LLM_MODEL = config('BOT_LLM_MODEL', default='claude-haiku-4-5-20251001')
 ALPACA_API_KEY = config('ALPACA_API_KEY', default='')
 ALPACA_API_SECRET = config('ALPACA_API_SECRET', default='')
 

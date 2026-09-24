@@ -15,6 +15,8 @@ from alpaca.trading.requests import (
 from alpaca.trading.enums import OrderSide, TimeInForce, QueryOrderStatus
 from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockLatestQuoteRequest
+from alpaca.data.requests import StockBarsRequest
+from alpaca.data.timeframe import TimeFrame
 
 from typing import Dict, List, Any, Optional
 from decimal import Decimal
@@ -68,6 +70,7 @@ class AlpacaClient(BrokerClient):
                 'cash': Decimal(str(account.cash)),
                 'buying_power': Decimal(str(account.buying_power)),
                 'portfolio_value': Decimal(str(account.portfolio_value)),
+                'last_equity': Decimal(str(account.last_equity)),
                 'currency': account.currency,
                 'pattern_day_trader': account.pattern_day_trader,
                 'trading_blocked': account.trading_blocked,
@@ -86,7 +89,8 @@ class AlpacaClient(BrokerClient):
         order_type: str,
         limit_price: Optional[Decimal] = None,
         stop_price: Optional[Decimal] = None,
-        time_in_force: str = 'day'
+        time_in_force: str = 'day',
+        client_order_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Submit order to Alpaca."""
         self._validate_order_params(symbol, quantity, side, order_type)
@@ -110,7 +114,8 @@ class AlpacaClient(BrokerClient):
                     symbol=symbol.upper(),
                     qty=quantity,
                     side=alpaca_side,
-                    time_in_force=alpaca_tif
+                    time_in_force=alpaca_tif,
+                    client_order_id=client_order_id,
                 )
 
             elif order_type.lower() == 'limit':
@@ -122,7 +127,8 @@ class AlpacaClient(BrokerClient):
                     qty=quantity,
                     side=alpaca_side,
                     time_in_force=alpaca_tif,
-                    limit_price=float(limit_price)
+                    limit_price=float(limit_price),
+                    client_order_id=client_order_id,
                 )
 
             elif order_type.lower() == 'stop':
@@ -134,7 +140,8 @@ class AlpacaClient(BrokerClient):
                     qty=quantity,
                     side=alpaca_side,
                     time_in_force=alpaca_tif,
-                    stop_price=float(stop_price)
+                    stop_price=float(stop_price),
+                    client_order_id=client_order_id,
                 )
 
             elif order_type.lower() == 'stop_limit':
@@ -147,7 +154,8 @@ class AlpacaClient(BrokerClient):
                     side=alpaca_side,
                     time_in_force=alpaca_tif,
                     stop_price=float(stop_price),
-                    limit_price=float(limit_price)
+                    limit_price=float(limit_price),
+                    client_order_id=client_order_id,
                 )
 
             else:
@@ -269,6 +277,55 @@ class AlpacaClient(BrokerClient):
         except Exception as e:
             logger.error(f"Error getting Alpaca quote for {symbol}: {e}")
             raise
+
+    async def get_daily_bars(self, symbol: str, *, limit: int = 20) -> List[Dict[str, Any]]:
+        """Fetch a short daily-bar window from the same account's data client."""
+        from datetime import datetime, timedelta, timezone as dt_timezone
+
+        request = StockBarsRequest(
+            symbol_or_symbols=symbol.upper(),
+            timeframe=TimeFrame.Day,
+            start=datetime.now(dt_timezone.utc) - timedelta(days=45),
+            limit=limit,
+        )
+        try:
+            frame = self.data_client.get_stock_bars(request).df
+            if frame.empty:
+                return []
+            if getattr(frame.index, 'nlevels', 1) > 1:
+                try:
+                    frame = frame.xs(symbol.upper(), level='symbol')
+                except KeyError:
+                    return []
+            bars = []
+            for timestamp, row in frame.tail(limit).iterrows():
+                bars.append({
+                    'timestamp': timestamp.isoformat() if hasattr(timestamp, 'isoformat') else str(timestamp),
+                    'open': str(row['open']),
+                    'high': str(row['high']),
+                    'low': str(row['low']),
+                    'close': str(row['close']),
+                    'volume': int(row['volume']),
+                })
+            return bars
+        except Exception as e:
+            logger.error("Error getting Alpaca daily bars for %s: %s", symbol, e)
+            raise
+
+    def get_market_clock(self) -> Dict[str, Any]:
+        """Return the broker's market-open state and next open/close times."""
+        clock = self.trading_client.get_clock()
+        return {
+            'is_open': bool(clock.is_open),
+            'timestamp': clock.timestamp,
+            'next_open': clock.next_open,
+            'next_close': clock.next_close,
+        }
+
+    def get_order_by_client_id(self, client_order_id: str) -> Dict[str, Any]:
+        """Look up an order by its stable client ID for safe task retries."""
+        order = self.trading_client.get_order_by_client_id(client_order_id)
+        return self._normalize_order(order)
 
     def get_broker_name(self) -> str:
         """Get broker name."""
