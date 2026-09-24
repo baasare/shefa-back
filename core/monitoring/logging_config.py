@@ -442,6 +442,14 @@ def get_logging_config():
                 'class': 'logging.StreamHandler',
                 'formatter': 'verbose'
             },
+            # Keep bot AI failures visible in hosted runtime logs without
+            # enabling verbose application logging in production. Bot warnings
+            # are deliberately sanitized and never include prompts or secrets.
+            'bot_console': {
+                'level': 'WARNING',
+                'class': 'logging.StreamHandler',
+                'formatter': 'verbose'
+            },
             'file': {
                 'level': 'INFO',
                 'class': 'core.monitoring.logging_config.S3RotatingFileHandler',
@@ -494,6 +502,11 @@ def get_logging_config():
             'apps.brokers': {
                 'handlers': ['console', 'file', 'security_file', 'error_file'],
                 'level': 'DEBUG',
+                'propagate': False,
+            },
+            'apps.bots': {
+                'handlers': ['bot_console', 'file', 'error_file'],
+                'level': 'WARNING',
                 'propagate': False,
             },
             'apps.portfolios': {
