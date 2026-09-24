@@ -234,8 +234,8 @@ SPECTACULAR_SETTINGS = {
 CELERY_BROKER_URL = config('REDIS_URL', default='redis://localhost:6379/0')
 CELERY_RESULT_BACKEND = 'django-db'
 
-ANTHROPIC_API_KEY = config('ANTHROPIC_API_KEY', default='')
-BOT_LLM_MODEL = config('BOT_LLM_MODEL', default='claude-haiku-4-5-20251001')
+GEMINI_API_KEY = config('GEMINI_API_KEY', default='')
+BOT_LLM_MODEL = config('BOT_LLM_MODEL', default='gemini-3.8-flash')
 ALPACA_API_KEY = config('ALPACA_API_KEY', default='')
 ALPACA_API_SECRET = config('ALPACA_API_SECRET', default='')
 
