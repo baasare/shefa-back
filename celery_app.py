@@ -21,10 +21,10 @@ app.autodiscover_tasks()
 
 # Celery Beat schedule for autonomous trading
 app.conf.beat_schedule = {
-    # Run periodic agent scan every 15 minutes during market hours (9:30 AM - 4:00 PM ET, Mon-Fri)
-    'run-periodic-agent-scan': {
-        'task': 'apps.agents.tasks.run_periodic_agent_scan',
-        'schedule': crontab(minute='*/15', hour='9-16', day_of_week='1-5'),  # Every 15 min during market hours
+    # V3 permits autonomous execution only through the verified Alpaca paper bot flow.
+    'schedule-active-paper-bots': {
+        'task': 'apps.bots.tasks.schedule_active_paper_bots',
+        'schedule': 60.0,
     },
     # Sync market data every 30 seconds
     'sync-market-data': {
@@ -80,12 +80,6 @@ app.conf.beat_schedule = {
         'task': 'apps.portfolios.tasks.cleanup_old_snapshots',
         'schedule': crontab(hour=3, minute=0, day_of_week=0),
         'kwargs': {'days': 365}
-    },
-    # Execute active strategies every hour during market hours
-    'execute-active-strategies': {
-        'task': 'apps.strategies.tasks.execute_all_active_strategies',
-        'schedule': crontab(minute=0),  # Every hour
-        'kwargs': {'dry_run': False}
     },
     # Cleanup old backtests weekly
     'cleanup-old-backtests': {

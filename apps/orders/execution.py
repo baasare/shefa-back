@@ -45,17 +45,43 @@ class OrderExecutionEngine:
         """
         self.user = user
         self.broker_connection = broker_connection
+        # Broker selection must wait until the target portfolio is known.
+        # Picking the first active user connection can route a paper portfolio
+        # through a live account.
+        self.broker_client = None
+        self._bound_portfolio_id = None
+        logger.info(f"Initialized OrderExecutionEngine for user {user.id}")
 
-        if not self.broker_connection:
-            # Get user's active broker connection
-            from apps.brokers.services import get_active_broker_connection
-            self.broker_connection = get_active_broker_connection(user)
+    def _bind_paper_broker(self, portfolio: Portfolio):
+        """Resolve and validate a broker connection against portfolio mode."""
+        if portfolio.user_id != self.user.id:
+            raise OrderExecutionError("Portfolio does not belong to this user")
+        if portfolio.portfolio_type not in {'paper', 'live'}:
+            raise OrderExecutionError("Unsupported portfolio execution mode")
+        if self._bound_portfolio_id and self._bound_portfolio_id != portfolio.id:
+            raise OrderExecutionError("Execution engine cannot be reused across portfolios")
 
-            if not self.broker_connection:
-                raise OrderExecutionError("No active broker connection found for user")
+        connection = self.broker_connection
+        if connection is None:
+            connection = getattr(portfolio, 'broker_connection', None)
+        if connection is None:
+            raise OrderExecutionError("No broker connection is attached to this portfolio")
+        if connection.user_id != self.user.id or connection.portfolio_id != portfolio.id:
+            raise OrderExecutionError("Broker connection is not attached to this portfolio")
+        if connection.status != 'active':
+            raise OrderExecutionError("Broker connection is not active")
 
-        self.broker_client = get_broker_client(self.broker_connection)
-        logger.info(f"Initialized OrderExecutionEngine for user {user.id} with broker {self.broker_connection.broker}")
+        if portfolio.portfolio_type == 'paper':
+            if connection.broker != 'alpaca_paper' or not connection.is_paper_trading:
+                raise OrderExecutionError("Paper portfolios may only use an Alpaca paper connection")
+        else:
+            raise OrderExecutionError("Live trading is disabled")
+
+        self.broker_connection = connection
+        self._bound_portfolio_id = portfolio.id
+        if self.broker_client is None:
+            self.broker_client = get_broker_client(connection)
+        return self.broker_client
 
     async def submit_order(
         self,
@@ -91,9 +117,8 @@ class OrderExecutionEngine:
         Raises:
             OrderExecutionError: If validation or submission fails
         """
-        # Validate portfolio ownership
-        if portfolio.user != self.user:
-            raise OrderExecutionError("Portfolio does not belong to user")
+        # Resolve and validate mode before any order is created or submitted.
+        self._bind_paper_broker(portfolio)
 
         # Validate order parameters
         await self._validate_order(portfolio, symbol, quantity, side, order_type, limit_price, stop_price)
@@ -161,6 +186,8 @@ class OrderExecutionEngine:
         if order.portfolio.user != self.user:
             raise OrderExecutionError("Order does not belong to user")
 
+        self._bind_paper_broker(order.portfolio)
+
         # Check if order is cancellable
         if order.status not in ['pending', 'submitted', 'partially_filled']:
             raise OrderExecutionError(f"Cannot cancel order with status: {order.status}")
@@ -199,6 +226,8 @@ class OrderExecutionEngine:
         if not order.broker_order_id:
             logger.warning(f"Order {order.id} has no broker ID, cannot update status")
             return order
+
+        self._bind_paper_broker(order.portfolio)
 
         try:
             broker_status = await self.broker_client.get_order_status(order.broker_order_id)
