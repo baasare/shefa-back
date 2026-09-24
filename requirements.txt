@@ -36,8 +36,7 @@ django-celery-results==2.6.0
 # LangGraph & AI
 langgraph
 langchain
-langchain-anthropic
-anthropic
+langchain-google-genai
 deepagents
 nest-asyncio
 

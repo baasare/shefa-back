@@ -4,7 +4,9 @@ V3 adds a LangChain-backed bot drafting and analysis API. Bots can only use a ve
 
 ## Local setup
 
-Set `ANTHROPIC_API_KEY`, `BOT_LLM_MODEL`, and `REDIS_URL` in the local backend environment. Create and migrate the database, then run Django, a Celery worker, and Celery Beat:
+Set `GEMINI_API_KEY`, `BOT_LLM_MODEL`, and `REDIS_URL` in the local backend environment. The default LLM is Gemini 3.8 Flash through LangChain. Create and migrate the database, then run Django, a Celery worker, and Celery Beat:
+
+Gemini analysis receives the bot's instructions, supplied market data, paper-account snapshot (portfolio value, daily P&L, open position count/symbols), and bot risk limits. Google's Gemini Developer API free tier may use submitted content to improve Google products; switch to the paid tier before sending data that should not be used this way.
 
 ```sh
 python manage.py migrate
@@ -19,7 +21,7 @@ The authenticated API lives under `/v1/bots/`. It supports draft creation, an op
 
 The existing Render blueprint provisions only a Free web service. It does not provision a persistent Celery worker, Celery Beat, or Redis. Therefore it cannot run scheduled bots and manual runs will return a clear queue-unavailable response until those services are deployed. Do not represent an active status as evidence that a run was executed.
 
-Before enabling execution in production, deploy a persistent worker and Beat process using the same backend commit, provision a durable Redis-compatible queue, set `REDIS_URL`, and set `ANTHROPIC_API_KEY` on the backend only. Confirm the broker is an Alpaca paper account. The V3 scheduler is the only periodic autonomous trading task; the legacy agent scan and live strategy execution schedules were removed. Do not enable live trading.
+Before enabling execution in production, deploy a persistent worker and Beat process using the same backend commit, provision a durable Redis-compatible queue, set `REDIS_URL`, and set `GEMINI_API_KEY` on the backend only. Confirm the broker is an Alpaca paper account. The V3 scheduler is the only periodic autonomous trading task; the legacy agent scan and live strategy execution schedules were removed. Do not enable live trading.
 
 Use Render's current service pricing before adding persistent infrastructure; worker and queue pricing may change. No paid service should be created without explicit cost approval.
 

@@ -8,7 +8,7 @@ AI-powered autonomous trading agent platform built with Django, Celery, and Lang
 - **API:** Django REST Framework with SSE streaming support
 - **Background Tasks:** Celery + Redis
 - **Database:** PostgreSQL
-- **AI/Agents:** LangGraph + Anthropic Claude
+- **AI/Agents:** LangGraph + LangChain + Gemini (V3 paper trading)
 - **Authentication:** JWT + OAuth (Google)
 
 ## Project Structure
@@ -160,7 +160,8 @@ See `.env.example` for all required environment variables.
 - `SECRET_KEY` - Django secret key
 - `POSTGRES_*` - Database credentials
 - `REDIS_URL` - Redis connection URL
-- `ANTHROPIC_API_KEY` - Claude API key
+- `GEMINI_API_KEY` - Google AI Studio Gemini API key
+- `BOT_LLM_MODEL` - Gemini model ID (defaults to `gemini-3.8-flash`)
 - `ALPACA_API_KEY` - Alpaca broker API key
 
 ## Development Tips
