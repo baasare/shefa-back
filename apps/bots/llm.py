@@ -1,8 +1,26 @@
 from decimal import Decimal
+import logging
 from typing import Literal
 
 from django.conf import settings
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
+
+
+def _upstream_status(exc: Exception):
+    """Return a numeric upstream status without logging prompts or credentials."""
+    status = getattr(exc, 'code', None)
+    if callable(status):
+        try:
+            status = status()
+        except Exception:
+            status = None
+    if isinstance(status, int):
+        return status
+    response = getattr(exc, 'response', None)
+    status = getattr(response, 'status_code', None)
+    return status if isinstance(status, int) else None
 
 
 class TradeSuggestion(BaseModel):
@@ -48,6 +66,11 @@ def draft_bot(idea: str) -> BotDraft:
         ])
         return result if isinstance(result, BotDraft) else BotDraft.model_validate(result)
     except Exception as exc:
+        logger.warning(
+            'Gemini bot draft request failed (%s, status=%s)',
+            type(exc).__name__,
+            _upstream_status(exc),
+        )
         raise BotAIError('The AI could not create a bot draft. Please try again or start from a template.') from exc
 
 
@@ -76,6 +99,11 @@ def suggest_trade(*, bot, symbol: str, quote: dict, bars: list[dict], portfolio:
         ])
         return result if isinstance(result, TradeSuggestion) else TradeSuggestion.model_validate(result)
     except Exception as exc:
+        logger.warning(
+            'Gemini trade suggestion request failed (%s, status=%s)',
+            type(exc).__name__,
+            _upstream_status(exc),
+        )
         raise BotAIError('The AI analysis failed. No order was submitted.') from exc
 
 
